@@ -102,20 +102,36 @@ install_update() {
     
     # Install dependencies
     echo -e "${YELLOW}→${NC} Installing dependencies..."
-    npm install --production --silent
+    npm install --production --silent 2>&1 | grep -v "npm WARN" || true
     echo -e "${GREEN}✓${NC} Dependencies installed"
+    
+    # Set correct permissions
+    echo -e "${YELLOW}→${NC} Setting permissions..."
+    chown -R mc-backup:mc-backup "$INSTALL_DIR"
+    chmod +x "$INSTALL_DIR/scripts/"*.sh
+    echo -e "${GREEN}✓${NC} Permissions set"
     
     # Update version file
     LATEST=$(get_latest_version)
     echo "$LATEST" > "$CURRENT_VERSION_FILE"
+    chown mc-backup:mc-backup "$CURRENT_VERSION_FILE"
     
     # Restart service
     echo -e "${YELLOW}→${NC} Restarting service..."
     systemctl start mc-backup
-    sleep 2
+    sleep 3
     
+    # Verify service is running
     if systemctl is-active --quiet mc-backup; then
         echo -e "${GREEN}✓${NC} Service restarted successfully"
+        
+        # Additional health check - verify bot is responsive
+        sleep 2
+        if journalctl -u mc-backup -n 20 --no-pager | grep -q "Bot logged in\|Ready"; then
+            echo -e "${GREEN}✓${NC} Bot is online and ready"
+        else
+            echo -e "${YELLOW}⚠${NC} Service started but waiting for bot to be ready..."
+        fi
     else
         echo -e "${RED}✗${NC} Service failed to start, rolling back..."
         
@@ -137,6 +153,9 @@ install_update() {
     echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
     echo ""
     echo "Updated to version: $LATEST"
+    echo ""
+    echo -e "${CYAN}Changelog:${NC}"
+    echo "View changes at: https://github.com/$REPO/commit/$LATEST"
 }
 
 # Main script
