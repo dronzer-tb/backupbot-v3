@@ -14,6 +14,9 @@
 
 set -e  # Exit on error
 
+# Ensure we can read from terminal even when piped
+exec < /dev/tty || true
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -76,7 +79,7 @@ ask_question() {
     fi
     
     echo -n "> "
-    read answer
+    read -r answer < /dev/tty
     
     if [ -z "$answer" ] && [ -n "$default" ]; then
         echo "$default"
@@ -97,7 +100,7 @@ ask_yes_no() {
     fi
     
     echo -n "> "
-    read answer
+    read -r answer < /dev/tty
     answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
     
     if [ -z "$answer" ]; then
@@ -199,7 +202,7 @@ check_existing_installation() {
         echo -e "${CYAN}4)${NC} Cancel"
         echo ""
         echo -n "Select option [1-4]: "
-        read INSTALL_OPTION
+        read -r INSTALL_OPTION < /dev/tty
         
         case $INSTALL_OPTION in
             1)
@@ -327,7 +330,7 @@ configure_pterodactyl() {
     while true; do
         echo -e "Enter your Pterodactyl panel URL (e.g., ${CYAN}https://panel.example.com${NC}):"
         echo -n "> "
-        read PANEL_URL
+        read -r PANEL_URL < /dev/tty
         
         if [ -z "$PANEL_URL" ]; then
             print_warning "Panel URL is required"
@@ -346,7 +349,7 @@ configure_pterodactyl() {
         echo -e "${YELLOW}Enter your Pterodactyl API key:${NC}"
         echo -e "${CYAN}(Create at: Panel → Account → API Credentials → Create API Key)${NC}"
         echo -n "> "
-        read -s API_KEY
+        read -r -s API_KEY < /dev/tty
         echo ""
         
         if [ -z "$API_KEY" ]; then
@@ -394,7 +397,7 @@ configure_pterodactyl() {
         echo -e "Enter your Minecraft server ID:"
         echo -e "${CYAN}(Found in URL: /server/<SERVER_ID>)${NC}"
         echo -n "> "
-        read SERVER_ID
+        read -r SERVER_ID < /dev/tty
         
         if [ -z "$SERVER_ID" ]; then
             print_warning "Server ID is required"
@@ -468,7 +471,7 @@ configure_backup() {
         echo ""
         echo -e "Enter world path ${CYAN}[$WORLD_PATH]${NC}:"
         echo -n "> "
-        read custom_path
+        read -r custom_path < /dev/tty
         if [ -n "$custom_path" ]; then
             WORLD_PATH="$custom_path"
             # Re-detect after manual entry
@@ -483,7 +486,7 @@ configure_backup() {
     echo ""
     echo -e "Where should local backups be stored? ${CYAN}[/backups/minecraft-smp]${NC}:"
     echo -n "> "
-    read BACKUP_DIR
+    read -r BACKUP_DIR < /dev/tty
     
     # Handle common inputs
     if [ -z "$BACKUP_DIR" ] || [ "$BACKUP_DIR" = "y" ] || [ "$BACKUP_DIR" = "Y" ]; then
@@ -500,7 +503,7 @@ configure_backup() {
     echo ""
     echo -e "How many days should local backups be retained? ${CYAN}[10]${NC}:"
     echo -n "> "
-    read RETENTION_DAYS
+    read -r RETENTION_DAYS < /dev/tty
     if [ -z "$RETENTION_DAYS" ]; then
         RETENTION_DAYS="10"
     fi
@@ -514,7 +517,7 @@ configure_backup() {
     echo -e "${CYAN}4)${NC} Every 6 hours (00:00, 06:00, 12:00, 18:00)"
     echo -e "${CYAN}5)${NC} Custom cron expression"
     echo -n "> "
-    read schedule_choice
+    read -r schedule_choice < /dev/tty
     
     case $schedule_choice in
         1)
@@ -532,7 +535,7 @@ configure_backup() {
         5)
             echo "Enter cron expression:"
             echo -n "> "
-            read custom_cron
+            read -r custom_cron < /dev/tty
             CRON_SCHEDULES="[\"$custom_cron\"]"
             ;;
         *)
@@ -563,7 +566,7 @@ configure_backup() {
         echo -e "${CYAN}Enter a name for this server instance:${NC}"
         echo -e "${YELLOW}Examples: smp, creative, modded, survival${NC}"
         echo -n "> "
-        read INSTANCE_NAME
+        read -r INSTANCE_NAME < /dev/tty
         if [ -z "$INSTANCE_NAME" ]; then
             INSTANCE_NAME="default"
         fi
@@ -587,7 +590,7 @@ configure_offsite() {
         echo -e "${CYAN}5)${NC} Custom S3-compatible"
         echo -e "${CYAN}6)${NC} I'll configure rclone manually later"
         echo -n "> "
-        read provider_choice
+        read -r provider_choice < /dev/tty
         
         # Install rclone
         install_rclone
@@ -607,7 +610,7 @@ configure_offsite() {
         echo ""
         echo -e "Offsite backup retention period (days)? ${CYAN}[30]${NC}:"
         echo -n "> "
-        read OFFSITE_RETENTION
+        read -r OFFSITE_RETENTION < /dev/tty
         if [ -z "$OFFSITE_RETENTION" ]; then
             OFFSITE_RETENTION="30"
         fi
@@ -615,7 +618,7 @@ configure_offsite() {
         echo ""
         echo -e "Bandwidth limit for uploads (e.g., 10M, 1G, or 'none')? ${CYAN}[none]${NC}:"
         echo -n "> "
-        read BANDWIDTH_LIMIT
+        read -r BANDWIDTH_LIMIT < /dev/tty
         if [ -z "$BANDWIDTH_LIMIT" ]; then
             BANDWIDTH_LIMIT="none"
         fi
@@ -633,18 +636,18 @@ configure_discord() {
     echo -e "${YELLOW}Enter your Discord bot token:${NC}"
     echo -e "${CYAN}(Create at: https://discord.com/developers/applications)${NC}"
     echo -n "> "
-    read -s BOT_TOKEN
+    read -r -s BOT_TOKEN < /dev/tty
     echo ""
     
     echo ""
     echo -e "Enter your Discord server (guild) ID:"
     echo -n "> "
-    read GUILD_ID
+    read -r GUILD_ID < /dev/tty
     
     echo ""
     echo -e "Enter channel ID for backup notifications:"
     echo -n "> "
-    read NOTIFICATION_CHANNEL
+    read -r NOTIFICATION_CHANNEL < /dev/tty
     
     # We'll use the same channel for commands by default
     COMMAND_CHANNEL="$NOTIFICATION_CHANNEL"
@@ -663,7 +666,7 @@ configure_permissions() {
     echo -e "${CYAN}Enter role names that can trigger backups (comma-separated):${NC}"
     echo -e "${YELLOW}Example: Admin,Moderator${NC}"
     echo -n "> "
-    read backup_roles
+    read -r backup_roles < /dev/tty
     
     # Convert to JSON array
     IFS=',' read -ra ROLES <<< "$backup_roles"
@@ -678,7 +681,7 @@ configure_permissions() {
     echo -e "${CYAN}Enter role names that can restore backups (comma-separated):${NC}"
     echo -e "${YELLOW}Example: Admin${NC}"
     echo -n "> "
-    read restore_roles
+    read -r restore_roles < /dev/tty
     
     # Convert to JSON array
     IFS=',' read -ra ROLES <<< "$restore_roles"
@@ -695,7 +698,7 @@ configure_alerts() {
     
     echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
     echo -n "> "
-    read WARN_THRESHOLD
+    read -r WARN_THRESHOLD < /dev/tty
     if [ -z "$WARN_THRESHOLD" ]; then
         WARN_THRESHOLD="80"
     fi
@@ -703,7 +706,7 @@ configure_alerts() {
     echo ""
     echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
     echo -n "> "
-    read CRIT_THRESHOLD
+    read -r CRIT_THRESHOLD < /dev/tty
     if [ -z "$CRIT_THRESHOLD" ]; then
         CRIT_THRESHOLD="95"
     fi
