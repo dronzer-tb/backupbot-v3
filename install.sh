@@ -218,6 +218,16 @@ check_existing_installation() {
 # Dependency Installation
 ###############################################################################
 
+install_curl() {
+    if command -v curl &> /dev/null; then
+        return
+    fi
+    
+    print_info "Installing curl..."
+    apt-get install -y curl >/dev/null 2>&1 || yum install -y curl >/dev/null 2>&1
+    print_success "curl installed"
+}
+
 install_nodejs() {
     print_info "Installing Node.js ${NODE_VERSION}..."
     
@@ -278,51 +288,113 @@ check_systemd() {
 configure_pterodactyl() {
     print_step "1/8" "Pterodactyl Configuration"
     
-    PANEL_URL=$(ask_question "Enter your Pterodactyl panel URL (e.g., https://panel.example.com)" "")
+    # Get Panel URL
+    while true; do
+        echo -e "Enter your Pterodactyl panel URL (e.g., ${CYAN}https://panel.example.com${NC}):"
+        echo -n "> "
+        read PANEL_URL
+        
+        if [ -z "$PANEL_URL" ]; then
+            print_warning "Panel URL is required"
+            continue
+        fi
+        
+        # Remove trailing slash if present
+        PANEL_URL="${PANEL_URL%/}"
+        break
+    done
     
     echo ""
-    echo -e "${YELLOW}Enter your Pterodactyl API key:${NC}"
-    echo -e "${CYAN}(Create at: Panel → Account → API Credentials → Create API Key)${NC}"
-    echo -n "> "
-    read -s API_KEY
-    echo ""
+    
+    # Get API Key
+    while true; do
+        echo -e "${YELLOW}Enter your Pterodactyl API key:${NC}"
+        echo -e "${CYAN}(Create at: Panel → Account → API Credentials → Create API Key)${NC}"
+        echo -n "> "
+        read -s API_KEY
+        echo ""
+        
+        if [ -z "$API_KEY" ]; then
+            print_warning "API key is required"
+            continue
+        fi
+        break
+    done
     
     # Test connection
+    echo ""
     echo -n "Testing connection..."
-    local test_response=$(curl -s -o /dev/null -w "%{http_code}" \
+    
+    local test_response
+    test_response=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Authorization: Bearer $API_KEY" \
         -H "Accept: application/json" \
-        "${PANEL_URL}/api/client" 2>/dev/null)
+        "${PANEL_URL}/api/client" 2>/dev/null || echo "000")
     
     if [ "$test_response" = "200" ]; then
+        echo ""
         print_success "Connected successfully!"
     else
+        echo ""
         print_error "Connection failed (HTTP $test_response)"
-        print_info "Please check your panel URL and API key"
-        exit 1
+        print_warning "Common issues:"
+        print_warning "  • Check that panel URL is correct (${PANEL_URL})"
+        print_warning "  • Verify API key is valid and not expired"
+        print_warning "  • Ensure panel is accessible from this server"
+        
+        if ask_yes_no "Try again with different credentials?" "y"; then
+            configure_pterodactyl
+            return
+        else
+            print_info "Installation cancelled"
+            exit 1
+        fi
     fi
     
     echo ""
-    SERVER_ID=$(ask_question "Enter your Minecraft server ID\n${CYAN}(Found in URL: /server/<SERVER_ID>)${NC}" "")
     
-    # Validate server ID
-    echo -n "Validating server ID..."
-    local server_response=$(curl -s \
-        -H "Authorization: Bearer $API_KEY" \
-        -H "Accept: application/json" \
-        "${PANEL_URL}/api/client/servers/${SERVER_ID}" 2>/dev/null)
-    
-    if echo "$server_response" | grep -q '"uuid"'; then
-        local server_name=$(echo "$server_response" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
-        print_success "Server found: \"$server_name\""
+    # Get Server ID
+    while true; do
+        echo ""
+        echo -e "Enter your Minecraft server ID:"
+        echo -e "${CYAN}(Found in URL: /server/<SERVER_ID>)${NC}"
+        echo -n "> "
+        read SERVER_ID
         
-        # Auto-detect world path
-        local server_uuid=$(echo "$server_response" | grep -o '"uuid":"[^"]*"' | cut -d'"' -f4)
-        WORLD_PATH="/var/lib/pterodactyl/volumes/${server_uuid}/world"
-    else
-        print_error "Server not found"
-        exit 1
-    fi
+        if [ -z "$SERVER_ID" ]; then
+            print_warning "Server ID is required"
+            continue
+        fi
+        
+        # Validate server ID
+        echo -n "Validating server ID..."
+        
+        local server_response
+        server_response=$(curl -s \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "Accept: application/json" \
+            "${PANEL_URL}/api/client/servers/${SERVER_ID}" 2>/dev/null || echo "{}")
+        
+        if echo "$server_response" | grep -q '"uuid"'; then
+            local server_name=$(echo "$server_response" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+            echo ""
+            print_success "Server found: \"$server_name\""
+            
+            # Auto-detect world path
+            local server_uuid=$(echo "$server_response" | grep -o '"uuid":"[^"]*"' | head -1 | cut -d'"' -f4)
+            WORLD_PATH="/var/lib/pterodactyl/volumes/${server_uuid}/world"
+            break
+        else
+            echo ""
+            print_error "Server not found"
+            print_warning "Please check the server ID and try again"
+            
+            if ! ask_yes_no "Try again?" "y"; then
+                print_info "Installation cancelled"
+                exit 1
+            fi
+        fi
+    done
 }
 
 configure_backup() {
@@ -330,20 +402,39 @@ configure_backup() {
     
     echo -e "Auto-detected world path: ${CYAN}$WORLD_PATH${NC}"
     if ! ask_yes_no "Is this correct?" "y"; then
-        WORLD_PATH=$(ask_question "Enter world path" "$WORLD_PATH")
+        echo ""
+        echo -e "Enter world path ${CYAN}[$WORLD_PATH]${NC}:"
+        echo -n "> "
+        read custom_path
+        if [ -n "$custom_path" ]; then
+            WORLD_PATH="$custom_path"
+        fi
     fi
     
     echo ""
-    BACKUP_DIR=$(ask_question "Where should local backups be stored?" "/backups/minecraft-smp")
+    echo -e "Where should local backups be stored? ${CYAN}[/backups/minecraft-smp]${NC}:"
+    echo -n "> "
+    read BACKUP_DIR
+    
+    # Handle common inputs
+    if [ -z "$BACKUP_DIR" ] || [ "$BACKUP_DIR" = "y" ] || [ "$BACKUP_DIR" = "Y" ]; then
+        BACKUP_DIR="/backups/minecraft-smp"
+    fi
     
     # Create backup directory
+    echo ""
     echo -n "Creating backup directory..."
     mkdir -p "$BACKUP_DIR"
     chmod 755 "$BACKUP_DIR"
     print_success "Created successfully"
     
     echo ""
-    RETENTION_DAYS=$(ask_question "How many days should local backups be retained?" "10")
+    echo -e "How many days should local backups be retained? ${CYAN}[10]${NC}:"
+    echo -n "> "
+    read RETENTION_DAYS
+    if [ -z "$RETENTION_DAYS" ]; then
+        RETENTION_DAYS="10"
+    fi
     
     # Backup schedule
     echo ""
@@ -414,10 +505,20 @@ configure_offsite() {
         esac
         
         echo ""
-        OFFSITE_RETENTION=$(ask_question "Offsite backup retention period (days)?" "30")
+        echo -e "Offsite backup retention period (days)? ${CYAN}[30]${NC}:"
+        echo -n "> "
+        read OFFSITE_RETENTION
+        if [ -z "$OFFSITE_RETENTION" ]; then
+            OFFSITE_RETENTION="30"
+        fi
         
         echo ""
-        BANDWIDTH_LIMIT=$(ask_question "Bandwidth limit for uploads (e.g., 10M, 1G, or 'none')?" "none")
+        echo -e "Bandwidth limit for uploads (e.g., 10M, 1G, or 'none')? ${CYAN}[none]${NC}:"
+        echo -n "> "
+        read BANDWIDTH_LIMIT
+        if [ -z "$BANDWIDTH_LIMIT" ]; then
+            BANDWIDTH_LIMIT="none"
+        fi
     else
         OFFSITE_ENABLED="false"
         REMOTE_NAME=""
@@ -436,10 +537,14 @@ configure_discord() {
     echo ""
     
     echo ""
-    GUILD_ID=$(ask_question "Enter your Discord server (guild) ID" "")
+    echo -e "Enter your Discord server (guild) ID:"
+    echo -n "> "
+    read GUILD_ID
     
     echo ""
-    NOTIFICATION_CHANNEL=$(ask_question "Enter channel ID for backup notifications" "")
+    echo -e "Enter channel ID for backup notifications:"
+    echo -n "> "
+    read NOTIFICATION_CHANNEL
     
     # We'll use the same channel for commands by default
     COMMAND_CHANNEL="$NOTIFICATION_CHANNEL"
@@ -488,8 +593,20 @@ configure_permissions() {
 configure_alerts() {
     print_step "6/8" "Storage Alerts"
     
-    WARN_THRESHOLD=$(ask_question "Disk usage warning threshold (%)?" "80")
-    CRIT_THRESHOLD=$(ask_question "Critical threshold (backups will stop)?" "95")
+    echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
+    echo -n "> "
+    read WARN_THRESHOLD
+    if [ -z "$WARN_THRESHOLD" ]; then
+        WARN_THRESHOLD="80"
+    fi
+    
+    echo ""
+    echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
+    echo -n "> "
+    read CRIT_THRESHOLD
+    if [ -z "$CRIT_THRESHOLD" ]; then
+        CRIT_THRESHOLD="95"
+    fi
 }
 
 review_configuration() {
@@ -630,8 +747,11 @@ install_application() {
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$BACKUP_DIR"
-    chmod 600 "$CONFIG_DIR/config.json"
+    chown "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR/config.json"
+    chmod 755 "$CONFIG_DIR"
+    chmod 640 "$CONFIG_DIR/config.json"
     chmod 755 "$BACKUP_DIR"
+    chmod 755 "$LOG_DIR"
     print_success "Set"
     
     # Install systemd service
@@ -726,6 +846,7 @@ main() {
     # Install dependencies
     echo ""
     print_info "Installing dependencies..."
+    install_curl
     install_nodejs
     install_rsync
     

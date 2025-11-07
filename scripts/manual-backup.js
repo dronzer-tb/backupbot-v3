@@ -2,7 +2,7 @@
  * Manual backup script (one-off backup)
  */
 
-const { ConfigManager } = require('../src/config/configManager');
+const ConfigManager = require('../src/config/configManager');
 const logger = require('../src/audit/logger');
 const PterodactylClient = require('../src/pterodactyl/apiClient');
 const ServerControl = require('../src/pterodactyl/serverControl');

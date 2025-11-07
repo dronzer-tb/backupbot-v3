@@ -5,7 +5,7 @@
  * with offsite replication and Discord-based management.
  */
 
-const { ConfigManager } = require('./config/configManager');
+const ConfigManager = require('./config/configManager');
 const logger = require('./audit/logger');
 const PterodactylClient = require('./pterodactyl/apiClient');
 const ServerControl = require('./pterodactyl/serverControl');

@@ -2,7 +2,7 @@
  * Test Pterodactyl API connection
  */
 
-const { ConfigManager } = require('../src/config/configManager');
+const ConfigManager = require('../src/config/configManager');
 const PterodactylClient = require('../src/pterodactyl/apiClient');
 
 async function testConnection() {

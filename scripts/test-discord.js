@@ -3,7 +3,7 @@
  */
 
 const { Client, GatewayIntentBits } = require('discord.js');
-const { ConfigManager } = require('../src/config/configManager');
+const ConfigManager = require('../src/config/configManager');
 
 async function testDiscord() {
   try {
