@@ -117,14 +117,24 @@ class BackupEngine {
       // Step 3.5: Fix file permissions (allows mc-backup user to read world files)
       console.log('Fixing file permissions...');
       try {
-        execSync('sudo /opt/mc-backup/scripts/fix-world-permissions.sh', { 
-          stdio: 'inherit',
-          timeout: 30000 // 30 second timeout
+        const permResult = execSync('sudo /opt/mc-backup/scripts/fix-world-permissions.sh', { 
+          timeout: 30000, // 30 second timeout
+          encoding: 'utf8'
         });
+        
+        // Show script output
+        if (permResult && permResult.trim()) {
+          console.log(permResult.trim());
+        }
+        
         console.log('✓ Permissions fixed successfully');
       } catch (permError) {
         console.warn('⚠️  Warning: Failed to fix permissions:', permError.message);
+        if (permError.stderr) {
+          console.warn('   Error details:', permError.stderr.toString().trim());
+        }
         console.warn('   Backup may fail if files are not readable by mc-backup user');
+        // Don't throw - try to continue with backup
       }
 
       // Step 4: Find previous backup for --link-dest
