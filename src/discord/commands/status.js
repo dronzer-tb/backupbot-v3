@@ -1,5 +1,5 @@
 /**
- * !backup status command
+ * Status command - Show backup system status
  */
 
 const { EmbedBuilder } = require('discord.js');
@@ -12,89 +12,113 @@ class StatusCommand {
     this.description = 'Show current backup status';
   }
 
+  /**
+   * Execute slash command
+   */
+  async executeSlash(interaction) {
+    await interaction.deferReply();
+    
+    try {
+      const embed = await this.buildStatusEmbed();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await interaction.editReply(`❌ Error getting status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Execute text command
+   */
   async execute(message, args) {
     try {
-      // Get backup stats
-      const stats = await this.bot.backupEngine.getStats();
-      
-      // Get server status
-      const serverStatus = await this.bot.backupEngine.serverControl.getStatus();
-
-      // Get current job
-      const currentJob = this.bot.backupEngine.getCurrentJob();
-
-      // Create embed
-      const embed = new EmbedBuilder()
-        .setColor(currentJob.running ? '#ffaa00' : '#00ff00')
-        .setTitle('📊 Backup System Status')
-        .setTimestamp();
-
-      // Current job status
-      if (currentJob.running) {
-        const duration = Math.floor(currentJob.duration / 1000);
-        embed.addFields({
-          name: '🔄 Current Job',
-          value: `**${currentJob.name}**\nRunning for ${duration}s\nTriggered by: ${currentJob.triggeredBy}`,
-          inline: false
-        });
-      } else {
-        embed.addFields({
-          name: '✅ Current Job',
-          value: 'Idle',
-          inline: false
-        });
-      }
-
-      // Last backup
-      if (stats.latestBackup) {
-        const age = this.getAge(stats.latestBackup.created);
-        embed.addFields({
-          name: '📁 Last Backup',
-          value: `**${stats.latestBackup.name}**\n${age} • ${stats.latestBackup.size}`,
-          inline: false
-        });
-      }
-
-      // Storage
-      embed.addFields({
-        name: '💾 Storage',
-        value: `**${stats.storage.disk.used}** / **${stats.storage.disk.total}** (${stats.storage.disk.percentage}%)\nAvailable: ${stats.storage.disk.available}`,
-        inline: false
-      });
-
-      // Total backups
-      embed.addFields({
-        name: '📦 Total Backups',
-        value: `${stats.totalBackups} backups\nRetention: ${stats.retention.retentionDays} days`,
-        inline: false
-      });
-
-      // Server status
-      const serverEmoji = serverStatus.state === 'running' ? '🟢' : '🔴';
-      embed.addFields({
-        name: `${serverEmoji} Minecraft Server`,
-        value: `State: **${serverStatus.state}**\nUptime: ${this.formatUptime(serverStatus.uptime)}`,
-        inline: false
-      });
-
-      // Next scheduled backup
-      const scheduler = this.bot.backupEngine.scheduler;
-      if (scheduler) {
-        const schedulerStatus = scheduler.getStatus();
-        if (schedulerStatus.running) {
-          embed.addFields({
-            name: '⏰ Scheduled Backups',
-            value: `${schedulerStatus.jobCount} schedule(s) active`,
-            inline: false
-          });
-        }
-      }
-
+      const embed = await this.buildStatusEmbed();
       await message.reply({ embeds: [embed] });
-
     } catch (error) {
       await message.reply(`❌ Error getting status: ${error.message}`);
     }
+  }
+
+  /**
+   * Build status embed (shared by both command types)
+   */
+  async buildStatusEmbed() {
+    // Get backup stats
+    const stats = await this.bot.backupEngine.getStats();
+    
+    // Get server status
+    const serverStatus = await this.bot.backupEngine.serverControl.getStatus();
+
+    // Get current job
+    const currentJob = this.bot.backupEngine.getCurrentJob();
+
+    // Create embed
+    const embed = new EmbedBuilder()
+      .setColor(currentJob.running ? 0xffaa00 : 0x00ff00)
+      .setTitle('📊 Backup System Status')
+      .setTimestamp();
+
+    // Current job status
+    if (currentJob.running) {
+      const duration = Math.floor(currentJob.duration / 1000);
+      embed.addFields({
+        name: '🔄 Current Job',
+        value: `**${currentJob.name}**\nRunning for ${duration}s\nTriggered by: ${currentJob.triggeredBy}`,
+        inline: false
+      });
+    } else {
+      embed.addFields({
+        name: '✅ Current Job',
+        value: 'Idle',
+        inline: false
+      });
+    }
+
+    // Last backup
+    if (stats.latestBackup) {
+      const age = this.getAge(stats.latestBackup.created);
+      embed.addFields({
+        name: '📁 Last Backup',
+        value: `**${stats.latestBackup.name}**\n${age} • ${stats.latestBackup.size}`,
+        inline: false
+      });
+    }
+
+    // Storage
+    embed.addFields({
+      name: '💾 Storage',
+      value: `**${stats.storage.disk.used}** / **${stats.storage.disk.total}** (${stats.storage.disk.percentage}%)\nAvailable: ${stats.storage.disk.available}`,
+      inline: false
+    });
+
+    // Total backups
+    embed.addFields({
+      name: '📦 Total Backups',
+      value: `${stats.totalBackups} backups\nRetention: ${stats.retention.retentionDays} days`,
+      inline: false
+    });
+
+    // Server status
+    const serverEmoji = serverStatus.state === 'running' ? '🟢' : '🔴';
+    embed.addFields({
+      name: `${serverEmoji} Minecraft Server`,
+      value: `State: **${serverStatus.state}**\nUptime: ${this.formatUptime(serverStatus.uptime)}`,
+      inline: false
+    });
+
+    // Next scheduled backup
+    const scheduler = this.bot.backupEngine.scheduler;
+    if (scheduler) {
+      const schedulerStatus = scheduler.getStatus();
+      if (schedulerStatus.running) {
+        embed.addFields({
+          name: '⏰ Scheduled Backups',
+          value: `${schedulerStatus.jobCount} schedule(s) active`,
+          inline: false
+        });
+      }
+    }
+
+    return embed;
   }
 
   getAge(date) {
