@@ -539,6 +539,37 @@ configure_backup() {
             CRON_SCHEDULES='["0 0 * * *","0 12 * * *"]'
             ;;
     esac
+    
+    # Multi-server detection
+    echo ""
+    echo -e "${BOLD}Server Setup Information:${NC}"
+    echo ""
+    if [ "$world_type" = "multi" ]; then
+        print_info "Multi-world detected: Paper/Spigot server with separate dimension folders"
+    else
+        print_info "Single world detected: Vanilla or single-folder server"
+    fi
+    
+    echo ""
+    echo -e "${CYAN}Do you have multiple Minecraft servers on this VPS?${NC}"
+    echo -e "${YELLOW}If yes, you can create additional instances later using:${NC}"
+    echo -e "${YELLOW}  sudo /opt/mc-backup/scripts/create-instance.sh <name>${NC}"
+    echo ""
+    if ask_yes_no "Is this your first/only server?" "y"; then
+        INSTANCE_NAME="default"
+        print_info "This will be your primary backup instance"
+    else
+        echo ""
+        echo -e "${CYAN}Enter a name for this server instance:${NC}"
+        echo -e "${YELLOW}Examples: smp, creative, modded, survival${NC}"
+        echo -n "> "
+        read INSTANCE_NAME
+        if [ -z "$INSTANCE_NAME" ]; then
+            INSTANCE_NAME="default"
+        fi
+        print_info "Instance name: $INSTANCE_NAME"
+        print_warning "Remember to stagger backup schedules for multiple servers!"
+    fi
 }
 
 configure_offsite() {
@@ -639,7 +670,7 @@ configure_permissions() {
     BACKUP_ROLES="["
     for role in "${ROLES[@]}"; do
         role=$(echo "$role" | xargs)  # Trim whitespace
-        BACKUP_ROLES="\"$role\","
+        BACKUP_ROLES="${BACKUP_ROLES}\"$role\","
     done
     BACKUP_ROLES="${BACKUP_ROLES%,}]"  # Remove trailing comma and close array
     
@@ -685,6 +716,12 @@ review_configuration() {
     echo -e "  Panel: $PANEL_URL"
     echo -e "  Server ID: $SERVER_ID"
     echo -e "  World Path: $WORLD_PATH"
+    if [ "$world_type" = "multi" ]; then
+        echo -e "  Server Type: ${CYAN}Paper/Spigot (Multi-world)${NC}"
+    else
+        echo -e "  Server Type: ${CYAN}Vanilla/Single-world${NC}"
+    fi
+    [ "$INSTANCE_NAME" != "default" ] && echo -e "  Instance: ${CYAN}$INSTANCE_NAME${NC}"
     echo ""
     echo -e "${BOLD}Backup:${NC}"
     echo -e "  Directory: $BACKUP_DIR"
