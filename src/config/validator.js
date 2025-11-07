@@ -46,6 +46,18 @@ class ConfigValidator {
         errors.push('backup.retention_local_days must be a positive integer');
       }
 
+      // Validate max_backup_size_gb if provided
+      if (config.backup.max_backup_size_gb !== undefined) {
+        if (!this.isPositiveNumber(config.backup.max_backup_size_gb)) {
+          errors.push('backup.max_backup_size_gb must be a positive number');
+        }
+      }
+
+      // Validate container path if use_container_path is enabled
+      if (config.backup.use_container_path && !config.backup.container_path) {
+        errors.push('backup.container_path is required when use_container_path is true');
+      }
+
       if (!config.backup.cron_schedules || !Array.isArray(config.backup.cron_schedules)) {
         errors.push('backup.cron_schedules must be an array');
       } else {
@@ -152,6 +164,13 @@ class ConfigValidator {
    */
   isPositiveInteger(value) {
     return Number.isInteger(value) && value > 0;
+  }
+
+  /**
+   * Validate positive number (including decimals)
+   */
+  isPositiveNumber(value) {
+    return typeof value === 'number' && value > 0;
   }
 
   /**

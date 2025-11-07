@@ -30,7 +30,8 @@ class BackupEngine {
    * @returns {Array} Array of world paths to backup
    */
   detectWorldStructure() {
-    const basePath = this.config.backup.source_path;
+    // Determine which path to use based on configuration
+    const basePath = this.getSourcePath();
     const netherPath = `${basePath}_nether`;
     const endPath = `${basePath}_the_end`;
 
@@ -46,6 +47,22 @@ class BackupEngine {
     // Single world structure
     console.log(`📁 Single world structure detected: ${basePath}`);
     return [basePath];
+  }
+
+  /**
+   * Get the correct source path based on configuration
+   * Handles Docker/Pterodactyl container path mapping
+   * @returns {string} The path to use for backups
+   */
+  getSourcePath() {
+    // If running inside container and container_path is configured, use it
+    if (this.config.backup.use_container_path && this.config.backup.container_path) {
+      console.log('ℹ️  Using container path for backup source');
+      return this.config.backup.container_path;
+    }
+
+    // Default to host path
+    return this.config.backup.source_path;
   }
 
   /**

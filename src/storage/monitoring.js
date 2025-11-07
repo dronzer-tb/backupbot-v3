@@ -15,6 +15,11 @@ class StorageMonitor {
     this.warningThreshold = config.alerts?.disk_usage_warning || 80;
     this.criticalThreshold = config.alerts?.disk_usage_critical || 95;
     this.lastAlertLevel = null;
+
+    // Storage allocation settings
+    this.useAllocatedStorage = config.alerts?.use_allocated_storage || false;
+    this.maxBackupSizeGB = config.backup?.max_backup_size_gb || null;
+    this.maxBackupSizeBytes = this.maxBackupSizeGB ? this.maxBackupSizeGB * 1024 * 1024 * 1024 : null;
   }
 
   /**
@@ -80,8 +85,27 @@ class StorageMonitor {
    */
   async checkDiskUsage(triggeredBy = 'system') {
     try {
-      const usage = await this.getBackupDiskUsage();
-      const percentage = usage.percentage;
+      let percentage;
+      let usage;
+
+      if (this.useAllocatedStorage && this.maxBackupSizeBytes) {
+        // Use allocated storage limits
+        const backupSize = await this.getBackupDirectorySize();
+        percentage = (backupSize / this.maxBackupSizeBytes) * 100;
+
+        usage = {
+          total: this.maxBackupSizeBytes,
+          used: backupSize,
+          available: this.maxBackupSizeBytes - backupSize,
+          percentage: Math.round(percentage),
+          filesystem: 'allocated',
+          mountpoint: this.backupDir
+        };
+      } else {
+        // Use system disk usage
+        usage = await this.getBackupDiskUsage();
+        percentage = usage.percentage;
+      }
 
       // Determine alert level
       let alertLevel = null;
@@ -114,13 +138,16 @@ class StorageMonitor {
    * Send storage alert
    */
   async sendAlert(level, usage, triggeredBy) {
+    const storageType = this.useAllocatedStorage && this.maxBackupSizeBytes ? 'allocated' : 'system disk';
+
     const details = {
       percentage: usage.percentage,
       total: this.formatBytes(usage.total),
       used: this.formatBytes(usage.used),
       available: this.formatBytes(usage.available),
       mountpoint: usage.mountpoint,
-      threshold: level === 'critical' ? this.criticalThreshold : this.warningThreshold
+      threshold: level === 'critical' ? this.criticalThreshold : this.warningThreshold,
+      storage_type: storageType
     };
 
     if (level === 'critical') {
@@ -138,16 +165,28 @@ class StorageMonitor {
    */
   async hasEnoughSpace(estimatedSize) {
     try {
-      const usage = await this.getBackupDiskUsage();
+      let available;
+
+      if (this.useAllocatedStorage && this.maxBackupSizeBytes) {
+        // Check against allocated storage limit
+        const backupSize = await this.getBackupDirectorySize();
+        available = this.maxBackupSizeBytes - backupSize;
+      } else {
+        // Check against system disk space
+        const usage = await this.getBackupDiskUsage();
+        available = usage.available;
+      }
 
       // Need at least 2x the estimated size for safety
       const requiredSpace = estimatedSize * 2;
 
       return {
-        hasSpace: usage.available >= requiredSpace,
-        available: usage.available,
+        hasSpace: available >= requiredSpace,
+        available: available,
         required: requiredSpace,
-        percentage: usage.percentage
+        percentage: this.useAllocatedStorage && this.maxBackupSizeBytes ?
+          Math.round(((this.maxBackupSizeBytes - available) / this.maxBackupSizeBytes) * 100) :
+          (await this.getBackupDiskUsage()).percentage
       };
     } catch (error) {
       return {

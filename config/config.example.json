@@ -6,7 +6,10 @@
   },
   "backup": {
     "source_path": "/var/lib/pterodactyl/volumes/SERVER_UUID/world",
+    "container_path": "/home/container/world",
+    "use_container_path": false,
     "backup_dir": "/backups/minecraft-smp",
+    "max_backup_size_gb": 50,
     "retention_local_days": 10,
     "cron_schedules": [
       "0 0 * * *",
@@ -37,6 +40,7 @@
   },
   "alerts": {
     "disk_usage_warning": 80,
-    "disk_usage_critical": 95
+    "disk_usage_critical": 95,
+    "use_allocated_storage": true
   }
 }
