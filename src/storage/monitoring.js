@@ -23,15 +23,24 @@ class StorageMonitor {
    */
   async getDiskUsage(path) {
     try {
+      // Ensure the directory exists
+      await fs.ensureDir(path);
+      
       const { stdout } = await execAsync(`df -k "${path}" | tail -n 1`);
       const parts = stdout.trim().split(/\s+/);
 
+      // Parse values, handling potential errors
+      const total = parseInt(parts[1]) || 0;
+      const used = parseInt(parts[2]) || 0;
+      const available = parseInt(parts[3]) || 0;
+      const percentage = parseInt(parts[4]) || 0;
+
       return {
         filesystem: parts[0],
-        total: parseInt(parts[1]) * 1024, // Convert to bytes
-        used: parseInt(parts[2]) * 1024,
-        available: parseInt(parts[3]) * 1024,
-        percentage: parseInt(parts[4]),
+        total: total * 1024, // Convert to bytes
+        used: used * 1024,
+        available: available * 1024,
+        percentage: percentage,
         mountpoint: parts[5]
       };
     } catch (error) {
