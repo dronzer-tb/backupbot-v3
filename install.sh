@@ -14,9 +14,6 @@
 
 set -e  # Exit on error
 
-# Ensure we can read from terminal even when piped
-exec < /dev/tty || true
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
