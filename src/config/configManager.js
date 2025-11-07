@@ -14,9 +14,15 @@ class ConfigManager {
 
   /**
    * Load configuration from file
+   * @param {string} customPath - Optional custom config path (overrides constructor)
    */
-  async load() {
+  async load(customPath = null) {
     try {
+      // Use custom path if provided (for multi-instance support)
+      if (customPath) {
+        this.configPath = customPath;
+      }
+
       // Check if config file exists
       if (!await fs.pathExists(this.configPath)) {
         // Try alternative paths

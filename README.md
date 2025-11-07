@@ -9,6 +9,8 @@ A standalone Node.js application running at the VPS host level to automate Minec
 ## ✨ Features
 
 - **Zero-Downtime Backups** - Uses `save-all` command instead of stopping the server
+- **Multi-World Support** - Automatically detects and backs up Paper-based multi-world setups (world/world_nether/world_the_end)
+- **Multi-Server Support** - Run multiple instances to back up multiple Minecraft servers on one VPS
 - **Incremental Backups** - rsync with `--link-dest` for space-efficient backups (95%+ space savings)
 - **Automated Scheduling** - Cron-based backup scheduling
 - **Discord Bot Integration** - Full backup management through Discord commands
@@ -19,6 +21,8 @@ A standalone Node.js application running at the VPS host level to automate Minec
 - **Retention Policies** - Configurable local and offsite retention
 - **SHA-256 Verification** - Integrity checking for all backups
 - **One-Command Installation** - Automated deployment with interactive wizard
+- **Update Mode** - Graceful updates without losing configuration
+- **Uninstall Script** - Clean removal with optional config/data preservation
 
 ## 🚀 Quick Start
 
@@ -223,6 +227,9 @@ grep "BACKUP_COMPLETED" /var/log/mc-backup/audit-*.log
 - [Installation Guide](docs/INSTALLATION.md)
 - [Configuration Reference](docs/CONFIGURATION.md)
 - [Discord Commands](docs/COMMANDS.md)
+- [Multi-Server Setup Guide](MULTI_SERVER_GUIDE.md) - **NEW!** Running multiple instances
+- [Update Guide](UPDATE_GUIDE.md)
+- [Deployment Success](DEPLOYMENT_SUCCESS.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [API Documentation](docs/API.md)
 
@@ -247,7 +254,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔄 Changelog
 
-### v1.0.0 (2025-11-07)
+### v1.1.0 (2025-01-XX)
+- **Multi-World Support**: Automatic detection of Paper-based multi-world setups
+- **Multi-Server Support**: Run multiple instances for different Minecraft servers
+- **Update Mode**: Graceful updates without config loss (`install.sh` now has update option)
+- **Uninstall Script**: Clean removal with data preservation options
+- **Instance Management**: Easy creation of new server instances via `create-instance.sh`
+
+### v1.0.0 (2025-01-07)
 - Initial release
 - Zero-downtime backups
 - Discord bot integration

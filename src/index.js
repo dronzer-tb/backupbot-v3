@@ -3,6 +3,8 @@
  * 
  * A standalone Node.js application for automating Minecraft world backups
  * with offsite replication and Discord-based management.
+ * 
+ * Supports multiple server instances via CONFIG_PATH environment variable.
  */
 
 const ConfigManager = require('./config/configManager');
@@ -15,6 +17,9 @@ const RestoreEngine = require('./restore/restoreEngine');
 const DiscordBot = require('./discord/bot');
 const ErrorHandler = require('./utils/errorHandler');
 
+// Support multiple instances via CONFIG_PATH
+const CONFIG_PATH = process.env.CONFIG_PATH || '/etc/mc-backup/config.json';
+
 class MinecraftBackupSystem {
   constructor() {
     this.config = null;
@@ -26,6 +31,20 @@ class MinecraftBackupSystem {
     this.restoreEngine = null;
     this.discordBot = null;
     this.offsiteManager = null;
+    this.instanceName = this.getInstanceName();
+  }
+
+  /**
+   * Get instance name from config path
+   * /etc/mc-backup/config.json -> "default"
+   * /etc/mc-backup-smp/config.json -> "smp"
+   */
+  getInstanceName() {
+    if (CONFIG_PATH === '/etc/mc-backup/config.json') {
+      return 'default';
+    }
+    const match = CONFIG_PATH.match(/\/etc\/mc-backup-([^\/]+)\//);
+    return match ? match[1] : 'default';
   }
 
   /**
@@ -34,11 +53,13 @@ class MinecraftBackupSystem {
   async init() {
     try {
       console.log('🚀 Starting Minecraft Backup System...\n');
+      console.log(`📦 Instance: ${this.instanceName}`);
+      console.log(`⚙️  Config: ${CONFIG_PATH}\n`);
 
       // Step 1: Load configuration
       console.log('📝 Loading configuration...');
       const configManager = ConfigManager.getInstance();
-      this.config = await configManager.load();
+      this.config = await configManager.load(CONFIG_PATH);
       console.log('✅ Configuration loaded\n');
 
       // Step 2: Initialize logger
@@ -49,7 +70,9 @@ class MinecraftBackupSystem {
       // Log service start
       logger.logServiceEvent('SERVICE_STARTED', {
         version: '1.0.0',
-        node_version: process.version
+        node_version: process.version,
+        instance: this.instanceName,
+        config_path: CONFIG_PATH
       });
 
       // Step 3: Initialize Pterodactyl client

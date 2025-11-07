@@ -191,26 +191,61 @@ check_disk_space() {
 check_existing_installation() {
     if [ -d "$INSTALL_DIR" ] || [ -f "/etc/systemd/system/mc-backup.service" ]; then
         print_warning "Existing installation detected"
+        echo ""
+        echo -e "${BOLD}What would you like to do?${NC}"
+        echo -e "${CYAN}1)${NC} Update existing installation (keep configuration)"
+        echo -e "${CYAN}2)${NC} Fresh install (remove and reinstall)"
+        echo -e "${CYAN}3)${NC} Uninstall only"
+        echo -e "${CYAN}4)${NC} Cancel"
+        echo ""
+        echo -n "Select option [1-4]: "
+        read INSTALL_OPTION
         
-        if ask_yes_no "Remove existing installation?" "n"; then
-            print_info "Stopping service..."
-            systemctl stop mc-backup 2>/dev/null || true
-            systemctl disable mc-backup 2>/dev/null || true
-            
-            print_info "Removing files..."
-            rm -rf "$INSTALL_DIR"
-            rm -f "/etc/systemd/system/mc-backup.service"
-            
-            if ask_yes_no "Remove configuration and backups?" "n"; then
-                rm -rf "$CONFIG_DIR"
-                print_warning "Backup directory NOT removed for safety"
-            fi
-            
-            print_success "Existing installation removed"
-        else
-            print_error "Cannot continue with existing installation"
-            exit 1
-        fi
+        case $INSTALL_OPTION in
+            1)
+                print_info "Updating existing installation..."
+                print_info "Configuration will be preserved"
+                # Stop service but keep config
+                systemctl stop mc-backup 2>/dev/null || true
+                # Will reinstall files but keep config
+                print_success "Ready to update"
+                ;;
+            2)
+                print_warning "This will remove the existing installation"
+                if ask_yes_no "Continue with fresh install?" "y"; then
+                    print_info "Stopping service..."
+                    systemctl stop mc-backup 2>/dev/null || true
+                    systemctl disable mc-backup 2>/dev/null || true
+                    
+                    print_info "Removing files..."
+                    rm -rf "$INSTALL_DIR"
+                    rm -f "/etc/systemd/system/mc-backup.service"
+                    
+                    if ask_yes_no "Remove configuration?" "n"; then
+                        rm -rf "$CONFIG_DIR"
+                    fi
+                    
+                    print_success "Existing installation removed"
+                else
+                    print_info "Installation cancelled"
+                    exit 0
+                fi
+                ;;
+            3)
+                print_info "Running uninstaller..."
+                if [ -f "$(dirname "$0")/uninstall.sh" ]; then
+                    bash "$(dirname "$0")/uninstall.sh"
+                else
+                    print_warning "uninstall.sh not found"
+                    print_info "Manual uninstall: systemctl stop mc-backup && rm -rf $INSTALL_DIR"
+                fi
+                exit 0
+                ;;
+            4|*)
+                print_info "Installation cancelled"
+                exit 0
+                ;;
+        esac
     fi
 }
 
@@ -397,10 +432,38 @@ configure_pterodactyl() {
     done
 }
 
+detect_multi_world() {
+    local base_path="$1"
+    local nether_path="${base_path}_nether"
+    local end_path="${base_path}_the_end"
+    
+    # Check if Paper-style multi-world structure exists
+    if [ -d "$nether_path" ] && [ -d "$end_path" ]; then
+        echo "multi"
+        return 0
+    else
+        echo "single"
+        return 0
+    fi
+}
+
 configure_backup() {
     print_step "2/8" "Backup Configuration"
     
+    # Detect world type
+    local world_type=$(detect_multi_world "$WORLD_PATH")
+    
     echo -e "Auto-detected world path: ${CYAN}$WORLD_PATH${NC}"
+    
+    if [ "$world_type" = "multi" ]; then
+        print_success "Detected Paper-based multi-world setup:"
+        echo -e "  ${GREEN}✓${NC} $WORLD_PATH"
+        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_nether"
+        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_the_end"
+        echo ""
+        echo -e "${YELLOW}Note: All three world folders will be backed up${NC}"
+    fi
+    
     if ! ask_yes_no "Is this correct?" "y"; then
         echo ""
         echo -e "Enter world path ${CYAN}[$WORLD_PATH]${NC}:"
@@ -408,6 +471,12 @@ configure_backup() {
         read custom_path
         if [ -n "$custom_path" ]; then
             WORLD_PATH="$custom_path"
+            # Re-detect after manual entry
+            world_type=$(detect_multi_world "$WORLD_PATH")
+            if [ "$world_type" = "multi" ]; then
+                echo ""
+                print_success "Multi-world setup detected at custom path"
+            fi
         fi
     fi
     

@@ -20,6 +20,35 @@ class BackupEngine {
     this.monitor = new StorageMonitor(config);
     this.cleanup = new CleanupManager(config);
     this.currentJob = null;
+    
+    // Detect multi-world structure
+    this.worldPaths = this.detectWorldStructure();
+  }
+
+  /**
+   * Detect if server uses Paper-style multi-world structure
+   * @returns {Array} Array of world paths to backup
+   */
+  detectWorldStructure() {
+    const basePath = this.config.backup.source_path;
+    const netherPath = `${basePath}_nether`;
+    const endPath = `${basePath}_the_end`;
+    
+    // Check if Paper multi-world structure exists
+    if (fs.existsSync(netherPath) && fs.existsSync(endPath)) {
+      logger.log('info', 'Multi-world structure detected (Paper-based)', {
+        overworld: basePath,
+        nether: netherPath,
+        end: endPath
+      });
+      return [basePath, netherPath, endPath];
+    }
+    
+    // Single world structure
+    logger.log('info', 'Single world structure detected', {
+      world: basePath
+    });
+    return [basePath];
   }
 
   /**
@@ -41,14 +70,20 @@ class BackupEngine {
 
       logger.logBackupStarted(triggeredBy, {
         backup_name: backupName,
-        source: this.config.backup.source_path,
-        destination: backupPath
+        source: this.worldPaths.join(', '),
+        destination: backupPath,
+        world_count: this.worldPaths.length
       });
 
-      // Step 1: Check disk space
+      // Step 1: Check disk space (estimate all worlds)
       console.log('Checking disk space...');
-      const estimatedSize = await this.rsync.estimateSize(this.config.backup.source_path);
-      const spaceCheck = await this.monitor.hasEnoughSpace(estimatedSize);
+      let totalEstimatedSize = 0;
+      for (const worldPath of this.worldPaths) {
+        const size = await this.rsync.estimateSize(worldPath);
+        totalEstimatedSize += size;
+      }
+      
+      const spaceCheck = await this.monitor.hasEnoughSpace(totalEstimatedSize);
 
       if (!spaceCheck.hasSpace) {
         throw new Error(`Insufficient disk space. Available: ${this.monitor.formatBytes(spaceCheck.available)}, Required: ${this.monitor.formatBytes(spaceCheck.required)}`);
@@ -72,16 +107,39 @@ class BackupEngine {
         console.log(`Using previous backup for hard-linking: ${previousBackup.name}`);
       }
 
-      // Step 5: Execute rsync backup
+      // Step 5: Execute rsync backup for all worlds
       console.log(`Starting rsync backup to ${backupName}...`);
-      const rsyncResult = await this.rsync.backup(
-        this.config.backup.source_path,
-        backupPath,
-        linkDest
-      );
+      console.log(`Backing up ${this.worldPaths.length} world folder(s)...`);
+      
+      let combinedStats = {
+        filesTransferred: 0,
+        bytesTransferred: 0,
+        totalSize: 0
+      };
+      
+      for (const worldPath of this.worldPaths) {
+        const worldName = path.basename(worldPath);
+        const worldBackupPath = path.join(backupPath, worldName);
+        const worldLinkDest = linkDest ? path.join(linkDest, worldName) : null;
+        
+        console.log(`  → Backing up ${worldName}...`);
+        
+        const rsyncResult = await this.rsync.backup(
+          worldPath,
+          worldBackupPath,
+          worldLinkDest
+        );
 
-      if (!rsyncResult.success) {
-        throw new Error(`rsync failed: ${rsyncResult.error}`);
+        if (!rsyncResult.success) {
+          throw new Error(`rsync failed for ${worldName}: ${rsyncResult.error}`);
+        }
+        
+        // Accumulate stats
+        if (rsyncResult.stats) {
+          combinedStats.filesTransferred += rsyncResult.stats.filesTransferred || 0;
+          combinedStats.bytesTransferred += rsyncResult.stats.bytesTransferred || 0;
+          combinedStats.totalSize += rsyncResult.stats.totalSize || 0;
+        }
       }
 
       console.log('rsync completed successfully');
@@ -94,7 +152,7 @@ class BackupEngine {
       await this.updateLatestSymlink(backupName);
 
       // Step 8: Calculate compression ratio
-      const compressionRatio = this.calculateCompressionRatio(rsyncResult.stats);
+      const compressionRatio = this.calculateCompressionRatio(combinedStats);
 
       // Step 9: Run cleanup if needed
       console.log('Running retention cleanup...');
@@ -107,10 +165,11 @@ class BackupEngine {
       logger.logBackupCompleted(triggeredBy, {
         backup_name: backupName,
         duration_ms: duration,
-        total_files: rsyncResult.stats.totalFiles,
-        transferred_files: rsyncResult.stats.transferredFiles,
-        total_size: rsyncResult.stats.totalSize,
-        transferred_size: rsyncResult.stats.transferredSize,
+        world_count: this.worldPaths.length,
+        worlds_backed_up: this.worldPaths.map(p => path.basename(p)),
+        files_transferred: combinedStats.filesTransferred,
+        bytes_transferred: combinedStats.bytesTransferred,
+        total_size: combinedStats.totalSize,
         compression_ratio: compressionRatio,
         cleanup_deleted: cleanupResult.deleted
       });

@@ -105,7 +105,28 @@ if ! git remote get-url origin &>/dev/null; then
 fi
 
 # Push to master branch
-git push origin master
+if ! git push origin master 2>&1; then
+    echo ""
+    echo -e "${YELLOW}Push failed - remote has changes we don't have locally${NC}"
+    echo -e "${BOLD}Attempting to pull and rebase...${NC}"
+    
+    # Pull with rebase
+    if git pull origin master --rebase; then
+        echo -e "${GREEN}✓${NC} Rebase successful"
+        
+        # Try push again
+        echo -e "${BOLD}Pushing again...${NC}"
+        git push origin master
+    else
+        echo ""
+        echo -e "${YELLOW}Rebase had conflicts - please resolve manually:${NC}"
+        echo -e "  1. Fix conflicts in the listed files"
+        echo -e "  2. Run: ${CYAN}git add <fixed-files>${NC}"
+        echo -e "  3. Run: ${CYAN}git rebase --continue${NC}"
+        echo -e "  4. Run: ${CYAN}git push origin master${NC}"
+        exit 1
+    fi
+fi
 
 echo ""
 echo -e "${CYAN}════════════════════════════════════════════════════════════${NC}"
