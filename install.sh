@@ -828,14 +828,34 @@ install_application() {
     if [ -f "package.json" ] && [ -d "src" ]; then
         # Running from local repository
         cp -r ./* "$INSTALL_DIR/"
+        print_success "Installed"
     else
-        # Download from GitHub (when available)
-        print_warning "Running from installer - manual file copy required"
-        print_info "Please copy application files to $INSTALL_DIR"
-        exit 1
+        # Download from GitHub
+        echo ""
+        print_info "Downloading from GitHub..."
+        
+        # Create temp directory
+        GITHUB_TEMP="/tmp/backupbot-download-$$"
+        mkdir -p "$GITHUB_TEMP"
+        
+        # Download and extract
+        if command -v wget &> /dev/null; then
+            wget -q -O "$GITHUB_TEMP/repo.tar.gz" https://github.com/dronzer-tb/backupbot-v3/archive/refs/heads/master.tar.gz
+        elif command -v curl &> /dev/null; then
+            curl -fsSL -o "$GITHUB_TEMP/repo.tar.gz" https://github.com/dronzer-tb/backupbot-v3/archive/refs/heads/master.tar.gz
+        else
+            print_error "Neither wget nor curl found"
+            exit 1
+        fi
+        
+        # Extract and copy
+        tar -xzf "$GITHUB_TEMP/repo.tar.gz" -C "$GITHUB_TEMP"
+        cp -r "$GITHUB_TEMP"/backupbot-v3-master/* "$INSTALL_DIR/"
+        
+        # Cleanup
+        rm -rf "$GITHUB_TEMP"
+        print_success "Installed"
     fi
-    
-    print_success "Installed"
     
     # Install npm dependencies
     echo -n "Installing Node.js dependencies..."
