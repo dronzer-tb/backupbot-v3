@@ -3,7 +3,7 @@
 # Minecraft Backup System - Automated Installation Script
 # 
 # One-command installation:
-# curl -fsSL https://raw.githubusercontent.com/dronzer-tb/backupbot-v3/main/install.sh | sudo bash
+# curl -fsSL https://raw.githubusercontent.com/dronzer-tb/backupbot-v3/master/install.sh | sudo bash
 #
 # This script will:
 # - Check system requirements

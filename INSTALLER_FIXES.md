@@ -164,7 +164,7 @@ sudo bash -x ./install.sh
 After testing, users can install with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/backupbot-v3/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/backupbot-v3/master/install.sh | sudo bash
 ```
 
 All fixes are backward compatible and improve the installation experience significantly!

@@ -25,7 +25,7 @@ A standalone Node.js application running at the VPS host level to automate Minec
 ### One-Line Installation (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dronzer-tb/backupbot-v3/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/dronzer-tb/backupbot-v3/master/install.sh | sudo bash
 ```
 
 The interactive installation wizard will guide you through:
