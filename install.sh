@@ -453,29 +453,65 @@ configure_backup() {
     # Detect world type
     local world_type=$(detect_multi_world "$WORLD_PATH")
     
-    echo -e "Auto-detected world path: ${CYAN}$WORLD_PATH${NC}"
+    echo -e "${BOLD}World Structure Detection${NC}"
+    echo ""
+    echo -e "Auto-detected base world path: ${CYAN}$WORLD_PATH${NC}"
+    echo ""
     
     if [ "$world_type" = "multi" ]; then
-        print_success "Detected Paper-based multi-world setup:"
-        echo -e "  ${GREEN}✓${NC} $WORLD_PATH"
-        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_nether"
-        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_the_end"
+        print_success "✓ Detected Paper/Spigot-based multi-world setup:"
+        echo -e "  ${GREEN}✓${NC} $WORLD_PATH ${CYAN}(Overworld)${NC}"
+        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_nether ${CYAN}(Nether)${NC}"
+        echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_the_end ${CYAN}(The End)${NC}"
         echo ""
-        echo -e "${YELLOW}Note: All three world folders will be backed up${NC}"
-    fi
-    
-    if ! ask_yes_no "Is this correct?" "y"; then
+        echo -e "${YELLOW}Note: All three world folders will be backed up together${NC}"
         echo ""
-        echo -e "Enter world path ${CYAN}[$WORLD_PATH]${NC}:"
-        echo -n "> "
-        read -r custom_path < /dev/tty
-        if [ -n "$custom_path" ]; then
-            WORLD_PATH="$custom_path"
-            # Re-detect after manual entry
-            world_type=$(detect_multi_world "$WORLD_PATH")
-            if [ "$world_type" = "multi" ]; then
-                echo ""
-                print_success "Multi-world setup detected at custom path"
+        
+        if ! ask_yes_no "Is this correct?" "y"; then
+            echo ""
+            print_warning "Manual world path configuration"
+            echo ""
+            echo -e "Enter the base world path ${CYAN}[$WORLD_PATH]${NC}:"
+            echo -n "> "
+            read -r custom_path < /dev/tty
+            if [ -n "$custom_path" ]; then
+                WORLD_PATH="$custom_path"
+                # Re-detect after manual entry
+                world_type=$(detect_multi_world "$WORLD_PATH")
+                if [ "$world_type" = "multi" ]; then
+                    echo ""
+                    print_success "Multi-world setup detected at custom path"
+                fi
+            fi
+        fi
+    else
+        print_info "Single world structure detected"
+        echo -e "  World path: ${CYAN}$WORLD_PATH${NC}"
+        echo ""
+        
+        # Check if user might have a different structure
+        echo -e "${YELLOW}Common server types:${NC}"
+        echo -e "  • ${CYAN}Vanilla/Forge/Fabric${NC}: Single 'world' folder"
+        echo -e "  • ${CYAN}Paper/Spigot${NC}: 'world', 'world_nether', 'world_the_end'"
+        echo -e "  • ${CYAN}Modded (custom)${NC}: Custom world folder name"
+        echo ""
+        
+        if ! ask_yes_no "Is the detected path correct?" "y"; then
+            echo ""
+            echo -e "Enter world path ${CYAN}[$WORLD_PATH]${NC}:"
+            echo -n "> "
+            read -r custom_path < /dev/tty
+            if [ -n "$custom_path" ]; then
+                WORLD_PATH="$custom_path"
+                # Re-detect after manual entry
+                world_type=$(detect_multi_world "$WORLD_PATH")
+                if [ "$world_type" = "multi" ]; then
+                    echo ""
+                    print_success "Multi-world setup detected at custom path!"
+                    echo -e "  ${GREEN}✓${NC} $WORLD_PATH"
+                    echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_nether"
+                    echo -e "  ${GREEN}✓${NC} ${WORLD_PATH}_the_end"
+                fi
             fi
         fi
     fi
@@ -490,12 +526,12 @@ configure_backup() {
         BACKUP_DIR="/backups/minecraft-smp"
     fi
     
-    # Create backup directory
+    # Create backup directory (will be remounted if using allocated storage)
     echo ""
     echo -n "Creating backup directory..."
     mkdir -p "$BACKUP_DIR"
     chmod 755 "$BACKUP_DIR"
-    print_success "Created successfully"
+    print_success "Created"
     
     echo ""
     echo -e "How many days should local backups be retained? ${CYAN}[10]${NC}:"
@@ -690,22 +726,123 @@ configure_permissions() {
     RESTORE_ROLES="${RESTORE_ROLES%,}]"
 }
 
-configure_alerts() {
-    print_step "6/8" "Storage Alerts"
+configure_storage_allocation() {
+    print_step "6/8" "Storage Allocation"
     
-    echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
-    echo -n "> "
-    read -r WARN_THRESHOLD < /dev/tty
-    if [ -z "$WARN_THRESHOLD" ]; then
-        WARN_THRESHOLD="80"
-    fi
-    
+    echo -e "${BOLD}Storage Allocation Strategy${NC}"
     echo ""
-    echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
-    echo -n "> "
-    read -r CRIT_THRESHOLD < /dev/tty
-    if [ -z "$CRIT_THRESHOLD" ]; then
+    echo -e "Would you like to allocate a dedicated storage quota for backups?"
+    echo -e "${CYAN}This creates an isolated storage container that prevents backups from filling your entire VPS disk.${NC}"
+    echo ""
+    
+    if ask_yes_no "Enable dedicated storage allocation?" "y"; then
+        USE_ALLOCATED_STORAGE="true"
+        
+        # Get available disk space
+        local available_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+        
+        echo ""
+        echo -e "${BOLD}Available disk space: ${GREEN}${available_gb}GB${NC}"
+        echo ""
+        
+        while true; do
+            echo -e "How much storage (in GB) should be allocated for backups? ${CYAN}[50]${NC}:"
+            echo -n "> "
+            read -r STORAGE_ALLOCATION < /dev/tty
+            
+            if [ -z "$STORAGE_ALLOCATION" ]; then
+                STORAGE_ALLOCATION="50"
+            fi
+            
+            # Validate input is a number
+            if ! [[ "$STORAGE_ALLOCATION" =~ ^[0-9]+$ ]]; then
+                print_error "Please enter a valid number"
+                continue
+            fi
+            
+            # Check if enough space available
+            if [ "$STORAGE_ALLOCATION" -gt "$available_gb" ]; then
+                print_error "Not enough space available (requested: ${STORAGE_ALLOCATION}GB, available: ${available_gb}GB)"
+                continue
+            fi
+            
+            # Warn if allocation is too high
+            local recommended_max=$((available_gb * 70 / 100))
+            if [ "$STORAGE_ALLOCATION" -gt "$recommended_max" ]; then
+                print_warning "You're allocating ${STORAGE_ALLOCATION}GB out of ${available_gb}GB available"
+                print_warning "Recommended maximum: ${recommended_max}GB (70% of available space)"
+                
+                if ! ask_yes_no "Continue anyway?" "n"; then
+                    continue
+                fi
+            fi
+            
+            break
+        done
+        
+        print_success "Storage quota set to ${STORAGE_ALLOCATION}GB"
+        
+        # Create loopback container
+        echo ""
+        echo -n "Creating storage container..."
+        
+        local container_path="/opt/mc-backup/backups.img"
+        local mount_point="$BACKUP_DIR"
+        
+        # Create container file
+        dd if=/dev/zero of="$container_path" bs=1G count="$STORAGE_ALLOCATION" status=none 2>&1
+        
+        # Format as ext4
+        mkfs.ext4 -q "$container_path" 2>&1
+        
+        # Mount the container
+        mkdir -p "$mount_point"
+        mount -o loop "$container_path" "$mount_point"
+        
+        print_success "Created and mounted"
+        
+        # Add to fstab for persistent mount
+        echo ""
+        echo -n "Adding to /etc/fstab for persistent mount..."
+        
+        # Check if already in fstab
+        if ! grep -q "$container_path" /etc/fstab 2>/dev/null; then
+            echo "$container_path $mount_point ext4 loop,defaults 0 0" >> /etc/fstab
+            print_success "Added"
+        else
+            print_success "Already configured"
+        fi
+        
+        # Set thresholds based on allocated storage
+        WARN_THRESHOLD="80"
         CRIT_THRESHOLD="95"
+        
+        echo ""
+        print_info "Allocated storage: ${STORAGE_ALLOCATION}GB"
+        print_info "Warning threshold: ${WARN_THRESHOLD}% (${STORAGE_ALLOCATION}GB × 0.80 = $((STORAGE_ALLOCATION * 80 / 100))GB)"
+        print_info "Critical threshold: ${CRIT_THRESHOLD}% (${STORAGE_ALLOCATION}GB × 0.95 = $((STORAGE_ALLOCATION * 95 / 100))GB)"
+        
+    else
+        USE_ALLOCATED_STORAGE="false"
+        STORAGE_ALLOCATION="0"
+        
+        echo ""
+        echo -e "${YELLOW}Using system disk monitoring instead${NC}"
+        echo ""
+        echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
+        echo -n "> "
+        read -r WARN_THRESHOLD < /dev/tty
+        if [ -z "$WARN_THRESHOLD" ]; then
+            WARN_THRESHOLD="80"
+        fi
+        
+        echo ""
+        echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
+        echo -n "> "
+        read -r CRIT_THRESHOLD < /dev/tty
+        if [ -z "$CRIT_THRESHOLD" ]; then
+            CRIT_THRESHOLD="95"
+        fi
     fi
 }
 
@@ -728,6 +865,18 @@ review_configuration() {
     echo -e "  Retention: $RETENTION_DAYS days"
     echo -e "  Schedules: $CRON_SCHEDULES"
     echo ""
+    echo -e "${BOLD}Storage:${NC}"
+    if [ "$USE_ALLOCATED_STORAGE" = "true" ]; then
+        echo -e "  Allocation: ${GREEN}${STORAGE_ALLOCATION}GB dedicated quota${NC}"
+        echo -e "  Container: /opt/mc-backup/backups.img"
+        echo -e "  Warning: ${WARN_THRESHOLD}%"
+        echo -e "  Critical: ${CRIT_THRESHOLD}%"
+    else
+        echo -e "  Allocation: ${YELLOW}System disk (no quota)${NC}"
+        echo -e "  Warning: ${WARN_THRESHOLD}%"
+        echo -e "  Critical: ${CRIT_THRESHOLD}%"
+    fi
+    echo ""
     echo -e "${BOLD}Offsite:${NC}"
     if [ "$OFFSITE_ENABLED" = "true" ]; then
         echo -e "  Enabled: ${GREEN}Yes${NC}"
@@ -742,10 +891,6 @@ review_configuration() {
     echo -e "  Notifications: Enabled"
     echo -e "  Backup Roles: $BACKUP_ROLES"
     echo -e "  Restore Roles: $RESTORE_ROLES"
-    echo ""
-    echo -e "${BOLD}Alerts:${NC}"
-    echo -e "  Warning: $WARN_THRESHOLD%"
-    echo -e "  Critical: $CRIT_THRESHOLD%"
     echo ""
     
     if ! ask_yes_no "Is this correct?" "y"; then
@@ -768,7 +913,10 @@ create_config_file() {
   },
   "backup": {
     "source_path": "$WORLD_PATH",
+    "container_path": "/home/container/world",
+    "use_container_path": false,
     "backup_dir": "$BACKUP_DIR",
+    "max_backup_size_gb": $STORAGE_ALLOCATION,
     "retention_local_days": $RETENTION_DAYS,
     "cron_schedules": $CRON_SCHEDULES
   },
@@ -795,7 +943,8 @@ create_config_file() {
   },
   "alerts": {
     "disk_usage_warning": $WARN_THRESHOLD,
-    "disk_usage_critical": $CRIT_THRESHOLD
+    "disk_usage_critical": $CRIT_THRESHOLD,
+    "use_allocated_storage": $USE_ALLOCATED_STORAGE
   }
 }
 EOF
@@ -915,7 +1064,7 @@ show_completion() {
     echo -e "${GREEN}${BOLD}✓ Installation Complete!${NC}"
     echo ""
     echo -e "Your backup system is now running. Here's what's happening:"
-    echo -e "  • Backups scheduled at: $(echo $CRON_SCHEDULES | sed 's/\[//g;s/\]//g;s/"//g')"
+    echo -e "  • Backups scheduled at: $(echo "$CRON_SCHEDULES" | sed 's/\[//g;s/\]//g;s/"//g')"
     echo -e "  • Discord bot is online in your server"
     echo -e "  • First backup will run at next scheduled time"
     echo ""
@@ -986,7 +1135,7 @@ main() {
     configure_offsite
     configure_discord
     configure_permissions
-    configure_alerts
+    configure_storage_allocation
     review_configuration
     
     # Install application
