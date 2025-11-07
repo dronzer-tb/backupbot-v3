@@ -784,7 +784,9 @@ configure_storage_allocation() {
         
         # Create loopback container
         echo ""
-        echo -n "Creating storage container..."
+        echo -e "${CYAN}Creating storage container (${STORAGE_ALLOCATION}GB)...${NC}"
+        echo -e "${YELLOW}This may take several minutes depending on disk speed${NC}"
+        echo ""
         
         local container_path="/opt/mc-backup/backups.img"
         local mount_point="$BACKUP_DIR"
@@ -792,8 +794,9 @@ configure_storage_allocation() {
         # Ensure parent directory exists
         mkdir -p /opt/mc-backup
         
-        # Create container file
-        if ! dd if=/dev/zero of="$container_path" bs=1G count="$STORAGE_ALLOCATION" status=none 2>&1; then
+        # Create container file with progress bar
+        echo -e "Writing ${STORAGE_ALLOCATION}GB to disk..."
+        if ! dd if=/dev/zero of="$container_path" bs=1M count=$((STORAGE_ALLOCATION * 1024)) status=progress 2>&1; then
             echo ""
             print_error "Failed to create storage container"
             print_warning "Falling back to system disk monitoring"
@@ -820,7 +823,12 @@ configure_storage_allocation() {
             return
         fi
         
+        echo ""
+        print_success "Container file created"
+        
         # Format as ext4
+        echo ""
+        echo -e "Formatting storage container as ext4..."
         if ! mkfs.ext4 -q "$container_path" 2>&1; then
             echo ""
             print_error "Failed to format storage container"
@@ -849,7 +857,11 @@ configure_storage_allocation() {
             return
         fi
         
+        print_success "Filesystem created"
+        
         # Mount the container
+        echo ""
+        echo -e "Mounting storage container..."
         mkdir -p "$mount_point"
         if ! mount -o loop "$container_path" "$mount_point" 2>&1; then
             echo ""
@@ -1108,6 +1120,60 @@ install_application() {
     chmod 755 "$BACKUP_DIR"
     chmod 755 "$LOG_DIR"
     print_success "Set"
+    
+    # Create permission fix script
+    echo -n "Creating permission fix script..."
+    cat > "$INSTALL_DIR/scripts/fix-world-permissions.sh" << 'EOF'
+#!/bin/bash
+# Fix permissions on Minecraft world files
+# This allows the mc-backup user to read world files created by Pterodactyl
+
+# Get world path from config
+WORLD_PATH=$(grep -oP '"source_path":\s*"\K[^"]+' /etc/mc-backup/config.json | head -1)
+WORLD_BASE=$(dirname "$WORLD_PATH")
+
+if [ -z "$WORLD_PATH" ]; then
+    echo "Error: Could not find world path in config"
+    exit 1
+fi
+
+# Give pterodactyl group read permission on all files
+[ -d "$WORLD_PATH" ] && find "$WORLD_PATH" -type f -exec chmod g+r {} \; 2>/dev/null
+
+# Check for multi-world structure (Paper/Spigot)
+NETHER_PATH="${WORLD_PATH}_nether"
+END_PATH="${WORLD_PATH}_the_end"
+
+[ -d "$NETHER_PATH" ] && find "$NETHER_PATH" -type f -exec chmod g+r {} \; 2>/dev/null
+[ -d "$END_PATH" ] && find "$END_PATH" -type f -exec chmod g+r {} \; 2>/dev/null
+
+# Give pterodactyl group execute on all directories (needed to traverse)
+[ -d "$WORLD_PATH" ] && find "$WORLD_PATH" -type d -exec chmod g+x {} \; 2>/dev/null
+[ -d "$NETHER_PATH" ] && find "$NETHER_PATH" -type d -exec chmod g+x {} \; 2>/dev/null
+[ -d "$END_PATH" ] && find "$END_PATH" -type d -exec chmod g+x {} \; 2>/dev/null
+
+exit 0
+EOF
+    chmod +x "$INSTALL_DIR/scripts/fix-world-permissions.sh"
+    print_success "Created"
+    
+    # Add mc-backup to pterodactyl group
+    echo -n "Adding $SERVICE_USER to pterodactyl group..."
+    if getent group pterodactyl >/dev/null 2>&1; then
+        usermod -aG pterodactyl "$SERVICE_USER"
+        print_success "Added"
+    else
+        print_warning "pterodactyl group not found (will skip permission fixes)"
+    fi
+    
+    # Configure sudoers for permission fix
+    echo -n "Configuring sudo permissions..."
+    cat > /etc/sudoers.d/mc-backup-permissions << EOF
+# Allow mc-backup user to fix world file permissions without password
+$SERVICE_USER ALL=(ALL) NOPASSWD: $INSTALL_DIR/scripts/fix-world-permissions.sh
+EOF
+    chmod 440 /etc/sudoers.d/mc-backup-permissions
+    print_success "Configured"
     
     # Install systemd service
     echo -n "Installing systemd service..."

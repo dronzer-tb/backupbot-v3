@@ -5,6 +5,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment');
+const { execSync } = require('child_process');
 const RsyncWrapper = require('./rsyncWrapper');
 const ChecksumManager = require('../storage/checksums');
 const StorageMonitor = require('../storage/monitoring');
@@ -112,6 +113,19 @@ class BackupEngine {
       // Step 3: Send save-all command to server (zero downtime!)
       console.log('Sending save-all command to server...');
       await this.serverControl.prepareForBackup(triggeredBy);
+
+      // Step 3.5: Fix file permissions (allows mc-backup user to read world files)
+      console.log('Fixing file permissions...');
+      try {
+        execSync('sudo /opt/mc-backup/scripts/fix-world-permissions.sh', { 
+          stdio: 'inherit',
+          timeout: 30000 // 30 second timeout
+        });
+        console.log('✓ Permissions fixed successfully');
+      } catch (permError) {
+        console.warn('⚠️  Warning: Failed to fix permissions:', permError.message);
+        console.warn('   Backup may fail if files are not readable by mc-backup user');
+      }
 
       // Step 4: Find previous backup for --link-dest
       const previousBackup = await this.getLatestBackup();
