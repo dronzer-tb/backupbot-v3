@@ -1,5 +1,5 @@
 /**
- * !backup now command
+ * Backup command - Create manual backups with button confirmation
  */
 
 const { EmbedBuilder } = require('discord.js');
@@ -7,11 +7,50 @@ const { EmbedBuilder } = require('discord.js');
 class BackupCommand {
   constructor(bot) {
     this.bot = bot;
-    this.name = 'now';
+    this.name = 'backup';
     this.requiredRoles = 'backup';
     this.description = 'Trigger immediate backup';
   }
 
+  /**
+   * Execute slash command with button confirmation
+   */
+  async executeSlash(interaction) {
+    try {
+      // Check if backup is already running
+      const currentJob = this.bot.backupEngine.getCurrentJob();
+      
+      if (currentJob.running) {
+        await interaction.reply({
+          content: `❌ A backup is already running: ${currentJob.name} (started ${Math.floor(currentJob.duration / 1000)}s ago)`,
+          ephemeral: true
+        });
+        return;
+      }
+
+      // Create confirmation embed
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle('🔄 Confirm Backup')
+        .setDescription('Click **Confirm** to start a manual backup.\n\n**Note:** Backup is zero-downtime - players can keep playing!')
+        .setFooter({ text: `Requested by ${interaction.user.tag}` })
+        .setTimestamp();
+
+      const row = this.bot.createConfirmButtons('confirm_backup');
+
+      await interaction.reply({ embeds: [embed], components: [row] });
+
+    } catch (error) {
+      await interaction.reply({ 
+        content: `❌ Error: ${error.message}`,
+        ephemeral: true 
+      });
+    }
+  }
+
+  /**
+   * Execute legacy text command
+   */
   async execute(message, args) {
     try {
       // Check if backup is already running
@@ -30,7 +69,7 @@ class BackupCommand {
 
       // Create success embed
       const embed = new EmbedBuilder()
-        .setColor('#00ff00')
+        .setColor(0x00ff00)
         .setTitle('✅ Backup Completed Successfully')
         .addFields(
           { name: 'Backup Name', value: result.backup.name, inline: true },
@@ -55,7 +94,7 @@ class BackupCommand {
 
     } catch (error) {
       const embed = new EmbedBuilder()
-        .setColor('#ff0000')
+        .setColor(0xff0000)
         .setTitle('❌ Backup Failed')
         .setDescription(error.message)
         .setFooter({ text: `Triggered by ${message.author.tag}` })

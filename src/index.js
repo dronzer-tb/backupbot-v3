@@ -119,12 +119,28 @@ class MinecraftBackupSystem {
       await this.discordBot.init();
       console.log('✅ Discord bot connected\n');
 
+      // Step 8.5: Deploy slash commands
+      console.log('📢 Deploying slash commands...');
+      try {
+        const { deployCommands } = require('./discord/deploy-commands');
+        await deployCommands();
+        console.log('✅ Slash commands deployed\n');
+      } catch (error) {
+        console.warn('⚠️  Failed to deploy slash commands:', error.message);
+        console.warn('   Bot will still work with text commands\n');
+      }
+
       // Step 9: Initialize and start scheduler
       console.log('⏰ Starting backup scheduler...');
       this.scheduler = new BackupScheduler(this.config, this.backupEngine);
       this.backupEngine.scheduler = this.scheduler; // Add reference
       this.scheduler.start();
       console.log('✅ Backup scheduler started\n');
+
+      // Step 10: Schedule daily update checks
+      console.log('🔄 Scheduling daily update checks...');
+      this.scheduleUpdateChecks();
+      console.log('✅ Update checker scheduled (daily at 12:00 PM)\n');
 
       // Setup signal handlers
       this.setupSignalHandlers();
@@ -144,6 +160,52 @@ class MinecraftBackupSystem {
       console.error('❌ Failed to initialize backup system:', error.message);
       await ErrorHandler.handle(error, 'Initialization', true);
     }
+  }
+
+  /**
+   * Schedule daily update checks
+   */
+  scheduleUpdateChecks() {
+    const cron = require('node-cron');
+    const { EmbedBuilder } = require('discord.js');
+    const { execSync } = require('child_process');
+
+    // Run every day at 12:00 PM
+    cron.schedule('0 12 * * *', async () => {
+      try {
+        console.log('🔍 Running scheduled update check...');
+        
+        const output = execSync('sudo /opt/mc-backup/scripts/auto-update.sh check', {
+          encoding: 'utf8',
+          timeout: 30000
+        });
+
+        if (output.includes('UPDATE_AVAILABLE')) {
+          // Extract version info
+          const match = output.match(/Current: ([\w.]+).*Available: ([\w.]+)/s);
+          const currentVersion = match ? match[1] : 'Unknown';
+          const availableVersion = match ? match[2] : 'Unknown';
+
+          const embed = new EmbedBuilder()
+            .setColor(0xffa500)
+            .setTitle('🔔 BackupBot Update Available!')
+            .setDescription('A new version is available for installation.')
+            .addFields(
+              { name: 'Current Version', value: currentVersion, inline: true },
+              { name: 'Available Version', value: availableVersion, inline: true }
+            )
+            .setFooter({ text: 'Use /update action:install to update' })
+            .setTimestamp();
+
+          await this.discordBot.sendNotification(embed);
+          console.log('✅ Update notification sent');
+        } else {
+          console.log('✅ No updates available');
+        }
+      } catch (error) {
+        console.error('Failed to check for updates:', error.message);
+      }
+    });
   }
 
   /**

@@ -94,6 +94,76 @@ if id "mc-backup" &>/dev/null; then
     echo -e "${GREEN}✓${NC} User removed"
 fi
 
+# Detect and remove loop containers
+echo ""
+echo -e "${BOLD}Checking for loop containers...${NC}"
+BACKUP_MOUNT=$(grep -E "^/backups/" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)
+CONTAINER_FILE=""
+
+if [ -n "$BACKUP_MOUNT" ]; then
+    echo -e "${GREEN}✓${NC} Found mounted backup container: $BACKUP_MOUNT"
+    LOOP_DEVICE=$(grep "$BACKUP_MOUNT" /proc/mounts | awk '{print $1}')
+    echo -e "${CYAN}ℹ${NC} Loop device: $LOOP_DEVICE"
+    
+    # Get container file path
+    if [ -n "$LOOP_DEVICE" ]; then
+        CONTAINER_FILE=$(losetup -l | grep "$LOOP_DEVICE" | awk '{print $6}')
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}⚠ Remove storage container and all backups?${NC}"
+    echo -e "${RED}   This will DELETE ALL BACKUP DATA!${NC}"
+    echo -n "Remove storage container? (y/N): "
+    read DELETE_STORAGE
+    
+    if [ "$DELETE_STORAGE" = "y" ] || [ "$DELETE_STORAGE" = "Y" ]; then
+        echo -e "${BOLD}Unmounting and removing storage container...${NC}"
+        
+        # Unmount
+        umount "$BACKUP_MOUNT" 2>/dev/null || true
+        echo -e "${GREEN}✓${NC} Unmounted $BACKUP_MOUNT"
+        
+        # Detach loop device
+        if [ -n "$LOOP_DEVICE" ]; then
+            losetup -d "$LOOP_DEVICE" 2>/dev/null || true
+            echo -e "${GREEN}✓${NC} Detached loop device $LOOP_DEVICE"
+        fi
+        
+        # Remove container file
+        if [ -n "$CONTAINER_FILE" ] && [ -f "$CONTAINER_FILE" ]; then
+            rm -f "$CONTAINER_FILE"
+            echo -e "${GREEN}✓${NC} Deleted container file: $CONTAINER_FILE"
+        fi
+        
+        # Remove mount directory
+        if [ -d "$BACKUP_MOUNT" ]; then
+            rm -rf "$BACKUP_MOUNT"
+            echo -e "${GREEN}✓${NC} Removed mount directory: $BACKUP_MOUNT"
+        fi
+        
+        # Clean up fstab entry
+        if grep -q "$BACKUP_MOUNT" /etc/fstab 2>/dev/null; then
+            sed -i "\|$BACKUP_MOUNT|d" /etc/fstab
+            echo -e "${GREEN}✓${NC} Removed fstab entry"
+        fi
+        
+        echo -e "${GREEN}✓${NC} Storage container completely removed"
+    else
+        echo -e "${CYAN}ℹ${NC} Storage container kept at $BACKUP_MOUNT"
+        echo -e "${CYAN}ℹ${NC} Container file: $CONTAINER_FILE"
+    fi
+else
+    echo -e "${CYAN}ℹ${NC} No mounted backup container found"
+fi
+
+# Remove sudoers file
+if [ -f "/etc/sudoers.d/mc-backup-permissions" ]; then
+    echo ""
+    echo -e "${BOLD}Removing sudoers configuration...${NC}"
+    rm -f /etc/sudoers.d/mc-backup-permissions
+    echo -e "${GREEN}✓${NC} Sudoers file removed"
+fi
+
 # Option 1: Remove config and logs
 if [ "$OPTION" = "1" ]; then
     if [ -d "$CONFIG_DIR" ]; then
@@ -123,11 +193,6 @@ if [ "$OPTION" = "1" ]; then
             echo -e "${CYAN}ℹ${NC} Logs kept at $LOG_DIR"
         fi
     fi
-    
-    echo ""
-    echo -e "${YELLOW}⚠ Note: Backup files are NOT removed automatically${NC}"
-    echo -e "${CYAN}ℹ${NC} Backups location: Check your configuration for backup_dir"
-    echo -e "${CYAN}ℹ${NC} To remove backups manually, delete the backup directory"
 fi
 
 # Option 2: Keep config and logs

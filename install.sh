@@ -1171,9 +1171,21 @@ EOF
     cat > /etc/sudoers.d/mc-backup-permissions << EOF
 # Allow mc-backup user to fix world file permissions without password
 $SERVICE_USER ALL=(ALL) NOPASSWD: $INSTALL_DIR/scripts/fix-world-permissions.sh
+
+# Allow mc-backup user to run auto-update script without password
+$SERVICE_USER ALL=(ALL) NOPASSWD: $INSTALL_DIR/scripts/auto-update.sh
 EOF
     chmod 440 /etc/sudoers.d/mc-backup-permissions
     print_success "Configured"
+    
+    # Make scripts executable
+    echo -n "Setting script permissions..."
+    chmod +x "$INSTALL_DIR/scripts/fix-world-permissions.sh"
+    chmod +x "$INSTALL_DIR/scripts/auto-update.sh"
+    chmod +x "$INSTALL_DIR/scripts/manual-backup.js"
+    chmod +x "$INSTALL_DIR/scripts/test-connection.js"
+    chmod +x "$INSTALL_DIR/scripts/test-discord.js"
+    print_success "Set"
     
     # Install systemd service
     echo -n "Installing systemd service..."
