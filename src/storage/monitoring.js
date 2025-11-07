@@ -25,7 +25,7 @@ class StorageMonitor {
     try {
       // Ensure the directory exists
       await fs.ensureDir(path);
-      
+
       const { stdout } = await execAsync(`df -k "${path}" | tail -n 1`);
       const parts = stdout.trim().split(/\s+/);
 
@@ -139,10 +139,10 @@ class StorageMonitor {
   async hasEnoughSpace(estimatedSize) {
     try {
       const usage = await this.getBackupDiskUsage();
-      
+
       // Need at least 2x the estimated size for safety
       const requiredSpace = estimatedSize * 2;
-      
+
       return {
         hasSpace: usage.available >= requiredSpace,
         available: usage.available,
@@ -189,12 +189,14 @@ class StorageMonitor {
    * Format bytes to human-readable format
    */
   formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    
+    if (bytes === 0) {
+      return '0 B';
+    }
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 

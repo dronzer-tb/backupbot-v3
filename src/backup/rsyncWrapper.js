@@ -177,12 +177,12 @@ class RsyncWrapper {
       const command = `du -sb "${source}" | cut -f1`;
       const { stdout } = await execAsync(command);
       const size = parseInt(stdout.trim()) || 0;
-      
+
       if (isNaN(size)) {
         console.warn(`⚠️  Could not determine size for: ${source}`);
         return 0;
       }
-      
+
       return size;
     } catch (error) {
       console.warn(`⚠️  Failed to estimate size for ${source}: ${error.message}`);
@@ -197,7 +197,7 @@ class RsyncWrapper {
     try {
       const { stdout } = await execAsync('rsync --version');
       const versionMatch = stdout.match(/rsync\s+version\s+([\d.]+)/);
-      
+
       return {
         available: true,
         version: versionMatch ? versionMatch[1] : 'unknown'

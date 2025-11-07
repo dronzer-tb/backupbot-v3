@@ -20,7 +20,7 @@ class RestoreVerification {
   async verifyBackupIntegrity(backupPath) {
     try {
       console.log('Verifying backup integrity...');
-      
+
       // Check if backup exists
       if (!await fs.pathExists(backupPath)) {
         return {
@@ -31,7 +31,7 @@ class RestoreVerification {
 
       // Verify checksums
       const result = await this.checksums.verifyBackup(backupPath);
-      
+
       return result;
     } catch (error) {
       return {
@@ -51,7 +51,7 @@ class RestoreVerification {
       const { exec } = require('child_process');
       const { promisify } = require('util');
       const execAsync = promisify(exec);
-      
+
       const { stdout } = await execAsync(`du -sb "${backupPath}" | cut -f1`);
       const backupSize = parseInt(stdout.trim());
 

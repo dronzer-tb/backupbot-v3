@@ -55,13 +55,13 @@ class ErrorHandler {
    */
   static async retry(fn, maxRetries = 3, baseDelay = 1000) {
     let lastError;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error;
-        
+
         if (attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
           console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
@@ -69,7 +69,7 @@ class ErrorHandler {
         }
       }
     }
-    
+
     throw lastError;
   }
 

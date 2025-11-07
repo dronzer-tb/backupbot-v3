@@ -26,7 +26,7 @@ class ServerControl {
       // Wait for server to stop (60 second timeout)
       try {
         await this.api.waitForState('offline', 60);
-        
+
         logger.logServerControl('SERVER_STOPPED', triggeredBy, {
           server_id: this.api.serverId,
           method: 'graceful'
@@ -36,7 +36,7 @@ class ServerControl {
       } catch (error) {
         // Graceful stop timed out, try force kill
         console.log('Graceful stop timed out, attempting force kill...');
-        
+
         logger.logServerControl('SERVER_STOP_TIMEOUT', triggeredBy, {
           server_id: this.api.serverId
         }, 'warning');
@@ -97,18 +97,14 @@ class ServerControl {
    * @param {string} triggeredBy - Who triggered the restart
    */
   async restartServer(triggeredBy = 'system') {
-    try {
-      await this.stopServer(triggeredBy);
-      
-      // Wait a moment before starting
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      await this.startServer(triggeredBy);
+    await this.stopServer(triggeredBy);
 
-      return { success: true };
-    } catch (error) {
-      throw error;
-    }
+    // Wait a moment before starting
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    await this.startServer(triggeredBy);
+
+    return { success: true };
   }
 
   /**
@@ -124,7 +120,7 @@ class ServerControl {
 
       // Check if server is running
       const isOnline = await this.api.isServerOnline();
-      
+
       if (!isOnline) {
         throw new Error('Server must be running to save world');
       }

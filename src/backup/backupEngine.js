@@ -20,7 +20,7 @@ class BackupEngine {
     this.monitor = new StorageMonitor(config);
     this.cleanup = new CleanupManager(config);
     this.currentJob = null;
-    
+
     // Detect multi-world structure
     this.worldPaths = this.detectWorldStructure();
   }
@@ -33,7 +33,7 @@ class BackupEngine {
     const basePath = this.config.backup.source_path;
     const netherPath = `${basePath}_nether`;
     const endPath = `${basePath}_the_end`;
-    
+
     // Check if Paper multi-world structure exists
     if (fs.existsSync(netherPath) && fs.existsSync(endPath)) {
       console.log('📁 Multi-world structure detected (Paper-based)');
@@ -42,7 +42,7 @@ class BackupEngine {
       console.log(`  → End: ${endPath}`);
       return [basePath, netherPath, endPath];
     }
-    
+
     // Single world structure
     console.log(`📁 Single world structure detected: ${basePath}`);
     return [basePath];
@@ -79,7 +79,7 @@ class BackupEngine {
         const size = await this.rsync.estimateSize(worldPath);
         totalEstimatedSize += size;
       }
-      
+
       const spaceCheck = await this.monitor.hasEnoughSpace(totalEstimatedSize);
 
       if (!spaceCheck.hasSpace) {
@@ -107,20 +107,22 @@ class BackupEngine {
       // Step 5: Execute rsync backup for all worlds
       console.log(`Starting rsync backup to ${backupName}...`);
       console.log(`Backing up ${this.worldPaths.length} world folder(s)...`);
-      
-      let combinedStats = {
-        filesTransferred: 0,
-        bytesTransferred: 0,
-        totalSize: 0
+
+      const combinedStats = {
+        totalFiles: 0,
+        transferredFiles: 0,
+        totalSize: 0,
+        transferredSize: 0,
+        speedup: 0
       };
-      
+
       for (const worldPath of this.worldPaths) {
         const worldName = path.basename(worldPath);
         const worldBackupPath = path.join(backupPath, worldName);
         const worldLinkDest = linkDest ? path.join(linkDest, worldName) : null;
-        
+
         console.log(`  → Backing up ${worldName}...`);
-        
+
         const rsyncResult = await this.rsync.backup(
           worldPath,
           worldBackupPath,
@@ -130,12 +132,14 @@ class BackupEngine {
         if (!rsyncResult.success) {
           throw new Error(`rsync failed for ${worldName}: ${rsyncResult.error}`);
         }
-        
+
         // Accumulate stats
         if (rsyncResult.stats) {
-          combinedStats.filesTransferred += rsyncResult.stats.filesTransferred || 0;
-          combinedStats.bytesTransferred += rsyncResult.stats.bytesTransferred || 0;
+          combinedStats.totalFiles += rsyncResult.stats.totalFiles || 0;
+          combinedStats.transferredFiles += rsyncResult.stats.transferredFiles || 0;
           combinedStats.totalSize += rsyncResult.stats.totalSize || 0;
+          combinedStats.transferredSize += rsyncResult.stats.transferredSize || 0;
+          combinedStats.speedup = rsyncResult.stats.speedup || 0;
         }
       }
 
@@ -180,7 +184,7 @@ class BackupEngine {
           name: backupName,
           path: backupPath,
           duration,
-          stats: rsyncResult.stats,
+          stats: combinedStats,
           compressionRatio,
           cleanupDeleted: cleanupResult.deleted
         }

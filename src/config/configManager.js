@@ -46,7 +46,7 @@ class ConfigManager {
 
       // Read and parse config
       const configData = await fs.readJSON(this.configPath);
-      
+
       // Validate configuration
       const validation = validator.validate(configData);
       if (!validation.valid) {

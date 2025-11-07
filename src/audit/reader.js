@@ -21,7 +21,7 @@ class AuditReader {
         .filter(f => f.startsWith('audit-') && f.endsWith('.log'))
         .sort()
         .reverse();
-      
+
       return logFiles.map(f => path.join(this.logPath, f));
     } catch (error) {
       console.error('Failed to read log directory:', error.message);
@@ -37,10 +37,12 @@ class AuditReader {
   async query(filters = {}, limit = 10) {
     const logFiles = await this.getLogFiles();
     const entries = [];
-    
+
     for (const logFile of logFiles) {
-      if (entries.length >= limit) break;
-      
+      if (entries.length >= limit) {
+        break;
+      }
+
       try {
         const fileEntries = await this.readLogFile(logFile, filters, limit - entries.length);
         entries.push(...fileEntries);
@@ -48,7 +50,7 @@ class AuditReader {
         console.error(`Failed to read log file ${logFile}:`, error.message);
       }
     }
-    
+
     return entries.slice(0, limit);
   }
 
@@ -72,7 +74,7 @@ class AuditReader {
 
         try {
           const entry = JSON.parse(line);
-          
+
           if (this.matchesFilters(entry, filters)) {
             entries.push(entry);
           }
@@ -93,19 +95,19 @@ class AuditReader {
     if (filters.action && entry.action !== filters.action) {
       return false;
     }
-    
+
     if (filters.level && entry.level !== filters.level) {
       return false;
     }
-    
+
     if (filters.result && entry.result !== filters.result) {
       return false;
     }
-    
+
     if (filters.triggered_by && !entry.triggered_by?.includes(filters.triggered_by)) {
       return false;
     }
-    
+
     if (filters.startDate) {
       const entryDate = new Date(entry.timestamp);
       const startDate = new Date(filters.startDate);
@@ -113,7 +115,7 @@ class AuditReader {
         return false;
       }
     }
-    
+
     if (filters.endDate) {
       const entryDate = new Date(entry.timestamp);
       const endDate = new Date(filters.endDate);
@@ -121,7 +123,7 @@ class AuditReader {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -160,7 +162,7 @@ class AuditReader {
     return entries.map(entry => {
       const timestamp = new Date(entry.timestamp).toLocaleString();
       const symbol = entry.result === 'success' ? '✅' : entry.result === 'failure' ? '❌' : '⚠️';
-      
+
       return `${symbol} [${timestamp}] ${entry.action} (by ${entry.triggered_by})`;
     });
   }

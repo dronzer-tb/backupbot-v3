@@ -46,7 +46,7 @@ class RestoreEngine {
       // Step 1: Pre-restore validation
       console.log('Running pre-restore checks...');
       const preChecks = await this.verification.preRestoreChecks(backupPath);
-      
+
       if (!preChecks.valid) {
         throw new Error(`Pre-restore checks failed: ${preChecks.error}`);
       }
@@ -76,7 +76,7 @@ class RestoreEngine {
       // Step 5: Verify restore
       console.log('Verifying restored files...');
       const postChecks = await this.verification.postRestoreChecks(restorePath, backupPath);
-      
+
       if (!postChecks.valid) {
         throw new Error(`Post-restore verification failed: ${postChecks.error}`);
       }
@@ -170,7 +170,7 @@ class RestoreEngine {
     while (Date.now() - startTime < timeoutMs) {
       try {
         const status = await this.serverControl.getStatus();
-        
+
         if (status.state === 'running') {
           console.log('Server is running normally');
           return true;
@@ -198,7 +198,7 @@ class RestoreEngine {
   async rollbackToSnapshot(snapshotName, triggeredBy = 'user') {
     try {
       console.log(`Rolling back to snapshot: ${snapshotName}`);
-      
+
       return await this.restoreBackup(snapshotName, triggeredBy);
     } catch (error) {
       throw new Error(`Rollback failed: ${error.message}`);
@@ -244,7 +244,7 @@ class RestoreEngine {
       const { exec } = require('child_process');
       const { promisify } = require('util');
       const execAsync = promisify(exec);
-      
+
       const { stdout } = await execAsync(`du -sb "${dirPath}" | cut -f1`);
       return parseInt(stdout.trim());
     } catch (error) {

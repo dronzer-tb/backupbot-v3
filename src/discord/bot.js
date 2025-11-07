@@ -25,7 +25,7 @@ class DiscordBot {
 
     // Command collection
     this.commands = new Collection();
-    
+
     // Pending confirmations
     this.pendingConfirmations = new Map();
   }
@@ -55,7 +55,7 @@ class DiscordBot {
    */
   async loadCommands() {
     const commandsPath = path.join(__dirname, 'commands');
-    
+
     if (!await fs.pathExists(commandsPath)) {
       console.log('Commands directory not found, skipping command loading');
       return;
@@ -68,7 +68,7 @@ class DiscordBot {
       const CommandClass = require(path.join(commandsPath, file));
       const command = new CommandClass(this);
       this.commands.set(command.name, command);
-      
+
       console.log(`Loaded command: ${command.name}`);
     }
   }
@@ -99,10 +99,12 @@ class DiscordBot {
    */
   async handleMessage(message) {
     // Ignore bot messages
-    if (message.author.bot) return;
+    if (message.author.bot) {
+      return;
+    }
 
     // Check if message is in configured channel
-    if (this.config.discord.command_channel_id && 
+    if (this.config.discord.command_channel_id &&
         message.channel.id !== this.config.discord.command_channel_id) {
       return;
     }
@@ -127,7 +129,7 @@ class DiscordBot {
 
     // Get command
     const command = this.commands.get(commandName);
-    
+
     if (!command) {
       await message.reply(`Unknown command: ${commandName}. Use \`!backup help\` for available commands.`);
       return;
@@ -136,25 +138,25 @@ class DiscordBot {
     // Check permissions
     if (!this.checkPermissions(message.member, command.requiredRoles || 'backup')) {
       await message.reply('❌ You do not have permission to use this command.');
-      
+
       logger.logDiscordCommand(commandName, message.author.tag, {
         result: 'permission_denied'
       }, 'failure');
-      
+
       return;
     }
 
     // Execute command
     try {
       await command.execute(message, args);
-      
+
       logger.logDiscordCommand(commandName, message.author.tag, {
         args: args.join(' ')
       }, 'success');
     } catch (error) {
       console.error(`Error executing command ${commandName}:`, error);
       await message.reply(`❌ Error executing command: ${error.message}`);
-      
+
       logger.logDiscordCommand(commandName, message.author.tag, {
         error: error.message
       }, 'failure');
@@ -165,10 +167,12 @@ class DiscordBot {
    * Check if user has required permissions
    */
   checkPermissions(member, requiredType) {
-    if (!member) return false;
+    if (!member) {
+      return false;
+    }
 
     let allowedRoles;
-    
+
     if (requiredType === 'restore') {
       allowedRoles = this.config.discord.allowed_roles_restore || [];
     } else {
@@ -185,14 +189,14 @@ class DiscordBot {
   async sendNotification(embed) {
     try {
       const channelId = this.config.discord.notification_channel_id;
-      
+
       if (!channelId) {
         console.log('No notification channel configured');
         return;
       }
 
       const channel = await this.client.channels.fetch(channelId);
-      
+
       if (!channel) {
         console.error('Notification channel not found');
         return;

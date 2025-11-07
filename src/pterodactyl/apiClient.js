@@ -157,7 +157,7 @@ class PterodactylClient {
     while (Date.now() - startTime < maxWaitMs) {
       try {
         const currentState = await this.getServerStatus();
-        
+
         if (currentState === targetState) {
           return true;
         }

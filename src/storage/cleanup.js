@@ -67,7 +67,7 @@ class CleanupManager {
       const { exec } = require('child_process');
       const { promisify } = require('util');
       const execAsync = promisify(exec);
-      
+
       const { stdout } = await execAsync(`du -sb "${dirPath}" | cut -f1`);
       return parseInt(stdout.trim());
     } catch (error) {
@@ -141,7 +141,7 @@ class CleanupManager {
           await this.deleteBackup(backup.path, backup.name);
           deletedBackups.push(backup.name);
           totalSizeFreed += backup.size;
-          
+
           console.log(`Deleted old backup: ${backup.name}`);
         } catch (error) {
           console.error(`Failed to delete backup ${backup.name}:`, error.message);
@@ -237,12 +237,14 @@ class CleanupManager {
    * Format bytes to human-readable format
    */
   formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    
+    if (bytes === 0) {
+      return '0 B';
+    }
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 }

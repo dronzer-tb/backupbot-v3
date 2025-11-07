@@ -38,7 +38,7 @@ class BackupScheduler {
     try {
       const job = cron.schedule(cronExpression, async () => {
         console.log(`Scheduled backup triggered by cron: ${cronExpression}`);
-        
+
         try {
           await this.backupEngine.executeBackup('cron');
         } catch (error) {
@@ -76,7 +76,7 @@ class BackupScheduler {
     // This is a simplified version - cron doesn't provide next run time easily
     // In production, you might want to use a library like cron-parser
     const schedules = this.config.backup.cron_schedules || [];
-    
+
     if (schedules.length === 0) {
       return null;
     }

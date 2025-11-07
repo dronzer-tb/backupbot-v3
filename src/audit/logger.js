@@ -11,10 +11,10 @@ class AuditLogger {
   constructor(config) {
     this.config = config;
     this.logPath = config.audit?.log_path || '/var/log/mc-backup';
-    
+
     // Ensure log directory exists
     this.ensureLogDirectory();
-    
+
     // Create Winston logger
     this.logger = this.createLogger();
   }

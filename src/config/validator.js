@@ -170,7 +170,7 @@ class ConfigValidator {
     }
 
     const parts = expression.trim().split(/\s+/);
-    
+
     // Standard cron has 5 or 6 parts
     if (parts.length < 5 || parts.length > 6) {
       return false;

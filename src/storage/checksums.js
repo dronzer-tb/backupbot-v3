@@ -52,7 +52,7 @@ class ChecksumManager {
 
       // Use find and sha256sum for better performance on large directories
       const command = `cd "${backupPath}" && find . -type f -exec sha256sum {} \\; > "${checksumFile}"`;
-      
+
       await execAsync(command);
 
       console.log(`Checksums saved to ${checksumFile}`);
@@ -80,13 +80,13 @@ class ChecksumManager {
 
       // Verify checksums
       const command = `cd "${backupPath}" && sha256sum -c "${checksumFile}" 2>&1`;
-      
+
       try {
         const { stdout } = await execAsync(command);
-        
+
         // Check if all files passed
         const failed = stdout.match(/FAILED/g);
-        
+
         if (failed) {
           return {
             valid: false,
@@ -125,7 +125,7 @@ class ChecksumManager {
   async readChecksums(backupName) {
     try {
       const checksumFile = this.getChecksumFile(backupName);
-      
+
       if (!await fs.pathExists(checksumFile)) {
         return null;
       }
