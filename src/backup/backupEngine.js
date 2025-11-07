@@ -36,18 +36,15 @@ class BackupEngine {
     
     // Check if Paper multi-world structure exists
     if (fs.existsSync(netherPath) && fs.existsSync(endPath)) {
-      logger.log('info', 'Multi-world structure detected (Paper-based)', {
-        overworld: basePath,
-        nether: netherPath,
-        end: endPath
-      });
+      console.log('📁 Multi-world structure detected (Paper-based)');
+      console.log(`  → Overworld: ${basePath}`);
+      console.log(`  → Nether: ${netherPath}`);
+      console.log(`  → End: ${endPath}`);
       return [basePath, netherPath, endPath];
     }
     
     // Single world structure
-    logger.log('info', 'Single world structure detected', {
-      world: basePath
-    });
+    console.log(`📁 Single world structure detected: ${basePath}`);
     return [basePath];
   }
 
