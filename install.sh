@@ -789,15 +789,95 @@ configure_storage_allocation() {
         local container_path="/opt/mc-backup/backups.img"
         local mount_point="$BACKUP_DIR"
         
+        # Ensure parent directory exists
+        mkdir -p /opt/mc-backup
+        
         # Create container file
-        dd if=/dev/zero of="$container_path" bs=1G count="$STORAGE_ALLOCATION" status=none 2>&1
+        if ! dd if=/dev/zero of="$container_path" bs=1G count="$STORAGE_ALLOCATION" status=none 2>&1; then
+            echo ""
+            print_error "Failed to create storage container"
+            print_warning "Falling back to system disk monitoring"
+            USE_ALLOCATED_STORAGE="false"
+            STORAGE_ALLOCATION="0"
+            
+            # Ask for thresholds instead
+            echo ""
+            echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
+            echo -n "> "
+            read -r WARN_THRESHOLD < /dev/tty
+            if [ -z "$WARN_THRESHOLD" ]; then
+                WARN_THRESHOLD="80"
+            fi
+            
+            echo ""
+            echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
+            echo -n "> "
+            read -r CRIT_THRESHOLD < /dev/tty
+            if [ -z "$CRIT_THRESHOLD" ]; then
+                CRIT_THRESHOLD="95"
+            fi
+            
+            return
+        fi
         
         # Format as ext4
-        mkfs.ext4 -q "$container_path" 2>&1
+        if ! mkfs.ext4 -q "$container_path" 2>&1; then
+            echo ""
+            print_error "Failed to format storage container"
+            print_warning "Removing incomplete container and falling back to system disk"
+            rm -f "$container_path"
+            USE_ALLOCATED_STORAGE="false"
+            STORAGE_ALLOCATION="0"
+            
+            # Ask for thresholds instead
+            echo ""
+            echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
+            echo -n "> "
+            read -r WARN_THRESHOLD < /dev/tty
+            if [ -z "$WARN_THRESHOLD" ]; then
+                WARN_THRESHOLD="80"
+            fi
+            
+            echo ""
+            echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
+            echo -n "> "
+            read -r CRIT_THRESHOLD < /dev/tty
+            if [ -z "$CRIT_THRESHOLD" ]; then
+                CRIT_THRESHOLD="95"
+            fi
+            
+            return
+        fi
         
         # Mount the container
         mkdir -p "$mount_point"
-        mount -o loop "$container_path" "$mount_point"
+        if ! mount -o loop "$container_path" "$mount_point" 2>&1; then
+            echo ""
+            print_error "Failed to mount storage container"
+            print_warning "Removing incomplete container and falling back to system disk"
+            rm -f "$container_path"
+            USE_ALLOCATED_STORAGE="false"
+            STORAGE_ALLOCATION="0"
+            
+            # Ask for thresholds instead
+            echo ""
+            echo -e "Disk usage warning threshold (%)? ${CYAN}[80]${NC}:"
+            echo -n "> "
+            read -r WARN_THRESHOLD < /dev/tty
+            if [ -z "$WARN_THRESHOLD" ]; then
+                WARN_THRESHOLD="80"
+            fi
+            
+            echo ""
+            echo -e "Critical threshold (backups will stop)? ${CYAN}[95]${NC}:"
+            echo -n "> "
+            read -r CRIT_THRESHOLD < /dev/tty
+            if [ -z "$CRIT_THRESHOLD" ]; then
+                CRIT_THRESHOLD="95"
+            fi
+            
+            return
+        fi
         
         print_success "Created and mounted"
         
