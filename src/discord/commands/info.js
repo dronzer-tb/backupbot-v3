@@ -13,6 +13,11 @@ class InfoCommand {
     this.description = 'Show detailed backup information';
   }
 
+  async executeSlash(interaction) {
+    const backupName = interaction.options.getString('backup');
+    await this.execute({ reply: interaction.reply.bind(interaction) }, [backupName]);
+  }
+
   async execute(message, args) {
     try {
       if (args.length === 0) {

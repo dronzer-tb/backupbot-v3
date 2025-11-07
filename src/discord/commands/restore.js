@@ -12,6 +12,11 @@ class RestoreCommand {
     this.description = 'Restore a specific backup';
   }
 
+  async executeSlash(interaction) {
+    const backupName = interaction.options.getString('backup');
+    await this.execute({ reply: interaction.reply.bind(interaction), author: interaction.user }, [backupName]);
+  }
+
   async execute(message, args) {
     try {
       // Check if backup name is provided

@@ -12,6 +12,10 @@ class ConfigCommand {
     this.description = 'Display current configuration';
   }
 
+  async executeSlash(interaction) {
+    await this.execute(interaction);
+  }
+
   async execute(message, args) {
     try {
       const configManager = require('../../config/configManager').getInstance();

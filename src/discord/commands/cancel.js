@@ -12,6 +12,10 @@ class CancelCommand {
     this.description = 'Cancel ongoing backup';
   }
 
+  async executeSlash(interaction) {
+    await this.execute({ reply: interaction.reply.bind(interaction) }, []);
+  }
+
   async execute(message, args) {
     try {
       const currentJob = this.bot.backupEngine.getCurrentJob();

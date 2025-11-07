@@ -12,52 +12,65 @@ class ListCommand {
     this.description = 'List available backups';
   }
 
+  async executeSlash(interaction) {
+    await interaction.deferReply();
+    
+    try {
+      const count = interaction.options.getInteger('count') || 10;
+      const embed = await this.buildListEmbed(count);
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await interaction.editReply(`❌ Error listing backups: ${error.message}`);
+    }
+  }
+
   async execute(message, args) {
     try {
-      const location = args[0]?.toLowerCase() || 'all';
-
-      if (!['local', 'offsite', 'all'].includes(location)) {
-        await message.reply('❌ Invalid location. Use: local, offsite, or all');
-        return;
-      }
-
-      // Get local backups
-      const backups = await this.bot.backupEngine.cleanup.getBackups();
-
-      if (backups.length === 0) {
-        await message.reply('📁 No backups found.');
-        return;
-      }
-
-      // Limit to 10 most recent backups
-      const displayBackups = backups.slice(0, 10);
-
-      // Create embed
-      const embed = new EmbedBuilder()
-        .setColor('#0099ff')
-        .setTitle(`📁 Available Backups (${backups.length} total)`)
-        .setDescription('Showing 10 most recent backups');
-
-      for (const backup of displayBackups) {
-        const age = this.getAge(backup.created);
-        const size = this.formatBytes(backup.size);
-        
-        embed.addFields({
-          name: `${this.getIcon(backup)} ${backup.name}`,
-          value: `📅 ${age} • 💾 ${size}`,
-          inline: false
-        });
-      }
-
-      if (backups.length > 10) {
-        embed.setFooter({ text: `Showing 10 of ${backups.length} backups` });
-      }
-
+      const count = parseInt(args[0]) || 10;
+      const embed = await this.buildListEmbed(count);
       await message.reply({ embeds: [embed] });
-
     } catch (error) {
       await message.reply(`❌ Error listing backups: ${error.message}`);
     }
+  }
+
+  async buildListEmbed(count = 10) {
+    // Get local backups
+    const backups = await this.bot.backupEngine.cleanup.getBackups();
+
+    if (backups.length === 0) {
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle('📁 No Backups Found')
+        .setDescription('No backups available yet.');
+      return embed;
+    }
+
+    // Limit to requested count
+    const displayBackups = backups.slice(0, Math.min(count, 50));
+
+    // Create embed
+    const embed = new EmbedBuilder()
+      .setColor(0x0099ff)
+      .setTitle(`📁 Available Backups (${backups.length} total)`)
+      .setDescription(`Showing ${displayBackups.length} most recent backups`);
+
+    for (const backup of displayBackups) {
+      const age = this.getAge(backup.created);
+      const size = this.formatBytes(backup.size);
+      
+      embed.addFields({
+        name: `${this.getIcon(backup)} ${backup.name}`,
+        value: `📅 ${age} • 💾 ${size}`,
+        inline: false
+      });
+    }
+
+    if (backups.length > displayBackups.length) {
+      embed.setFooter({ text: `Showing ${displayBackups.length} of ${backups.length} backups` });
+    }
+
+    return embed;
   }
 
   getIcon(backup) {

@@ -12,6 +12,10 @@ class HelpCommand {
     this.description = 'Show available commands';
   }
 
+  async executeSlash(interaction) {
+    await this.execute({ reply: interaction.reply.bind(interaction) }, []);
+  }
+
   async execute(message, args) {
     const embed = new EmbedBuilder()
       .setColor('#0099ff')
