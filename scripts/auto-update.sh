@@ -79,18 +79,35 @@ install_update() {
     cp -r "$INSTALL_DIR" "$BACKUP_DIR"
     echo -e "${GREEN}✓${NC} Backup created: $BACKUP_DIR"
     
-    # Pull latest code
-    echo -e "${YELLOW}→${NC} Pulling latest code from GitHub..."
-    cd "$INSTALL_DIR"
-    
-    # Save config before pulling
+    # Save config before updating
     if [ -f "/etc/mc-backup/config.json" ]; then
         cp /etc/mc-backup/config.json /tmp/mc-backup-config-backup.json
     fi
     
-    # Reset any local changes and pull
-    git fetch origin
-    git reset --hard origin/master
+    # Check if this is a git repository
+    cd "$INSTALL_DIR"
+    if [ -d ".git" ]; then
+        # Git repository - use git pull
+        echo -e "${YELLOW}→${NC} Pulling latest code from GitHub (git)..."
+        git fetch origin
+        git reset --hard origin/master
+    else
+        # Not a git repo - download latest release
+        echo -e "${YELLOW}→${NC} Downloading latest code from GitHub (archive)..."
+        TEMP_DIR="/tmp/mc-backup-download-$$"
+        mkdir -p "$TEMP_DIR"
+        
+        # Download and extract
+        curl -sL "https://github.com/$REPO/archive/refs/heads/master.tar.gz" | tar xz -C "$TEMP_DIR"
+        
+        # Remove old files (except config and data)
+        cd "$INSTALL_DIR"
+        find . -mindepth 1 -maxdepth 1 ! -name 'node_modules' ! -name 'data' -exec rm -rf {} +
+        
+        # Copy new files
+        cp -r "$TEMP_DIR"/backupbot-v3-master/* "$INSTALL_DIR/"
+        rm -rf "$TEMP_DIR"
+    fi
     
     # Restore config
     if [ -f "/tmp/mc-backup-config-backup.json" ]; then
