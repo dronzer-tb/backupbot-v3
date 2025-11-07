@@ -1,0 +1,42 @@
+{
+  "pterodactyl": {
+    "panel_url": "https://panel.example.com",
+    "api_key": "your_pterodactyl_api_key_here",
+    "server_id": "12345678"
+  },
+  "backup": {
+    "source_path": "/var/lib/pterodactyl/volumes/SERVER_UUID/world",
+    "backup_dir": "/backups/minecraft-smp",
+    "retention_local_days": 10,
+    "cron_schedules": [
+      "0 0 * * *",
+      "0 12 * * *",
+      "0 18 * * *"
+    ]
+  },
+  "rclone": {
+    "enabled": false,
+    "remote_name": "gdrive:minecraft-backups",
+    "retention_offsite_days": 30,
+    "sync_after_backup": true,
+    "bandwidth_limit": "",
+    "schedule_limits": []
+  },
+  "discord": {
+    "bot_token": "your_discord_bot_token_here",
+    "guild_id": "your_guild_id",
+    "command_channel_id": "your_command_channel_id",
+    "notification_channel_id": "your_notification_channel_id",
+    "allowed_roles_backup": ["Admin", "Moderator"],
+    "allowed_roles_restore": ["Admin"]
+  },
+  "audit": {
+    "log_path": "/var/log/mc-backup",
+    "retention_days": 90,
+    "format": "json"
+  },
+  "alerts": {
+    "disk_usage_warning": 80,
+    "disk_usage_critical": 95
+  }
+}
