@@ -168,11 +168,25 @@ class RsyncWrapper {
    */
   async estimateSize(source) {
     try {
+      // Check if source exists
+      if (!await fs.pathExists(source)) {
+        console.warn(`⚠️  Path does not exist: ${source}`);
+        return 0;
+      }
+
       const command = `du -sb "${source}" | cut -f1`;
       const { stdout } = await execAsync(command);
-      return parseInt(stdout.trim());
+      const size = parseInt(stdout.trim()) || 0;
+      
+      if (isNaN(size)) {
+        console.warn(`⚠️  Could not determine size for: ${source}`);
+        return 0;
+      }
+      
+      return size;
     } catch (error) {
-      throw new Error(`Failed to estimate size: ${error.message}`);
+      console.warn(`⚠️  Failed to estimate size for ${source}: ${error.message}`);
+      return 0;
     }
   }
 
